@@ -51,17 +51,35 @@ export default function Venta() {
   const setQty = (key, qty) => setCart((c) => (qty <= 0 ? c.filter((i) => i.key !== key) : c.map((i) => (i.key === key ? { ...i, qty } : i))));
   const clear = () => { setCart([]); setCustomer(''); setNotes(''); setDiscount(''); setOrderType('mostrador'); };
 
-  const onSaved = async (sale) => {
+  const [saving, setSaving] = useState(false);
+
+  const onSaved = (sale) => {
     setPaying(false);
     setLastSale(sale);
     clear();
     refresh();
-    toast(`Venta #${sale.number} registrada — ${money(sale.total)}`);
-    if (settings.auto_print === '1') {
-      const r = await api.printSale(sale.id);
-      if (!r.ok) toast('No se pudo imprimir: ' + r.error, 'error');
+    toast(`✓ Pedido #${sale.number} — ${money(sale.total)}`);
+    // La impresión va a una cola en segundo plano: no se espera, se sigue vendiendo.
+    if (settings.auto_print === '1' && settings.printer_name) {
+      api.printSale(sale.id).then((r) => { if (!r.ok) toast(`Pedido #${sale.number}: no se imprimió (${r.error})`, 'error'); });
     }
   };
+
+  const register = async (payments, cash) => {
+    if (saving) return; // evita doble registro por doble toque
+    setSaving(true);
+    try {
+      const sale = await api.db('createSale', {
+        items: cart, discount: disc, payments, customer, notes, order_type: orderType,
+        cash_received: cash?.received, change_given: cash?.change,
+      });
+      onSaved(sale);
+    } catch (e) { toast(cleanErr(e), 'error'); }
+    setSaving(false);
+  };
+
+  // Cobro en un toque con el total exacto
+  const quickPay = (method) => register([{ method, amount: total, reference: '' }]);
 
   if (!session) {
     return (
@@ -77,9 +95,21 @@ export default function Venta() {
   return (
     <div className="pos">
       <section className="catalog">
+        {settings.auto_print === '1' && !settings.printer_name && (
+          <div className="alert warn row between">
+            <span>⚠ No hay ticketera configurada: los tickets y comandas no se imprimen.</span>
+            <button className="btn ghost sm" onClick={() => go('config')}>Configurar</button>
+          </div>
+        )}
         <div className="catalog-top">
           <input ref={searchRef} className="input" placeholder="Buscar producto (F8)…" value={search} onChange={(e) => setSearch(e.target.value)} />
           <button className="btn ghost" onClick={() => setCustom(true)}>+ Ítem libre</button>
+          {lastSale && (
+            <div className="last-sale">
+              <span>Último: <b>#{lastSale.number}</b> {money(lastSale.total)}</span>
+              <button className="btn ghost sm" onClick={() => api.printSale(lastSale.id, { preview: !settings.printer_name }).then((r) => { if (!r.ok) toast(r.error, 'error'); })}>Reimprimir</button>
+            </div>
+          )}
         </div>
         <div className="cats">
           <button className={'cat ' + (cat === 'all' ? 'active' : '')} onClick={() => setCat('all')}>Todos</button>
@@ -128,25 +158,22 @@ export default function Venta() {
         </div>
 
         <div className="order-foot">
-          <input className="input" placeholder="Observaciones para cocina (sin sal, etc.)" value={notes} onChange={(e) => setNotes(e.target.value)} />
-          <div className="totals">
-            <div className="row between"><span>Subtotal</span><span>{money(subtotal)}</span></div>
-            <div className="row between center-y">
-              <span>Descuento $</span>
-              <input className="input sm right" style={{ width: 120 }} value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0" />
-            </div>
-            <div className="row between total"><span>TOTAL</span><span>{money(total)}</span></div>
+          <div className="row gap">
+            <input className="input grow" placeholder="Obs. cocina (sin sal…)" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <input className="input right" style={{ width: 110 }} value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="Desc. $" title="Descuento en pesos" />
+          </div>
+          <div className="row between total"><span>TOTAL</span><span>{money(total)}</span></div>
+          <div className="quick-pay">
+            {settings.payment_methods.map((m) => (
+              <button key={m.id} className={'qp ' + (m.id === 'efectivo' ? 'cash' : '')} disabled={!cart.length || saving} onClick={() => quickPay(m.id)}>
+                {m.label}
+              </button>
+            ))}
           </div>
           <div className="row gap">
-            <button className="btn ghost" disabled={!cart.length} onClick={clear}>Vaciar</button>
-            <button className="btn primary lg grow" disabled={!cart.length} onClick={() => setPaying(true)}>Cobrar (F9)</button>
+            <button className="btn ghost big-btn" disabled={!cart.length} onClick={clear}>Vaciar</button>
+            <button className="btn ghost big-btn grow" disabled={!cart.length || saving} onClick={() => setPaying(true)}>Vuelto / dividir pago (F9)</button>
           </div>
-          {lastSale && (
-            <div className="last-sale">
-              Última: <b>#{lastSale.number}</b> {money(lastSale.total)}
-              <button className="link" onClick={async () => { const r = await api.printSale(lastSale.id); if (!r.ok) toast(r.error, 'error'); }}>Reimprimir</button>
-            </div>
-          )}
         </div>
       </section>
 
@@ -154,15 +181,7 @@ export default function Venta() {
         <PayModal
           total={total}
           onClose={() => setPaying(false)}
-          onConfirm={async (payments, cash) => {
-            try {
-              const sale = await api.db('createSale', {
-                items: cart, discount: disc, payments, customer, notes, order_type: orderType,
-                cash_received: cash?.received, change_given: cash?.change,
-              });
-              onSaved(sale);
-            } catch (e) { toast(cleanErr(e), 'error'); }
-          }}
+          onConfirm={register}
         />
       )}
 

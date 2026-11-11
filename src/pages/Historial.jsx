@@ -131,8 +131,8 @@ export default function Historial() {
           <div className="row between mt">
             {detail.status === 'ok' ? <button className="btn danger ghost" onClick={() => setVoiding({ sale: detail, reason: '' })}>Anular venta</button> : <span />}
             <div className="row gap">
-              <button className="btn ghost" onClick={() => api.printSale(detail.id, { ticket: false, comanda: true })}>Reimprimir comanda</button>
-              <button className="btn primary" onClick={() => api.printSale(detail.id, { ticket: true, comanda: false })}>Reimprimir ticket</button>
+              <button className="btn ghost" onClick={() => api.printSale(detail.id, { ticket: false, comanda: true, preview: !settings.printer_name })}>Reimprimir comanda</button>
+              <button className="btn primary" onClick={() => api.printSale(detail.id, { ticket: true, comanda: false, preview: !settings.printer_name })}>Reimprimir ticket</button>
             </div>
           </div>
         </Modal>

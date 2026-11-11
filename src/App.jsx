@@ -28,7 +28,7 @@ export default function App() {
 
   const toast = useCallback((msg, type = 'ok') => {
     const id = Math.random();
-    setToasts((t) => [...t, { id, msg, type }]);
+    setToasts((t) => [...t, { id, msg, type }].slice(-3));
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), type === 'error' ? 6000 : 3000);
   }, []);
 
@@ -88,7 +88,7 @@ export default function App() {
           <div className="brand">{settings.business_name}</div>
           <nav>
             {PAGES.map((p) => (
-              <button key={p.id} className={'nav ' + (page === p.id ? 'active' : '')} onClick={() => go(p.id)}>
+              <button key={p.id} title={p.label} className={'nav ' + (page === p.id ? 'active' : '')} onClick={() => go(p.id)}>
                 <span className="ico">{p.icon}</span>
                 <span className="lbl">{p.label}</span>
                 {p.id === 'pagos' && pending > 0 && <span className="badge">{pending}</span>}

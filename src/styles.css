@@ -182,3 +182,86 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
   .pos { grid-template-columns: 1fr 360px; }
   .two-col, .two-col.wide-left { grid-template-columns: 1fr; }
 }
+
+/* ===== Pantalla de venta: tamaños grandes para uso rápido / táctil ===== */
+.pos { grid-template-columns: 1fr 480px; }
+.catalog { padding: 18px; gap: 16px; }
+.catalog-top .input { font-size: 17px; padding: 12px 14px; }
+.catalog-top .btn { font-size: 16px; padding: 12px 18px; }
+.pos .cats { gap: 10px; }
+.pos .cat { font-size: 19px; padding: 14px 26px; border-width: 3px; min-height: 58px; }
+.pos .grid { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+.pos .prod { min-height: 150px; padding: 18px; border-left-width: 10px; border-radius: 14px; }
+.pos .prod-name { font-size: 22px; line-height: 1.2; }
+.pos .prod-price { font-size: 24px; }
+.pos .prod:active { transform: scale(.95); background: #ffedd5; }
+
+.order-head .seg button { font-size: 16px; padding: 12px 4px; }
+.order-head .input { font-size: 16px; padding: 12px 14px; }
+.item { padding: 12px 0; }
+.item-name { font-size: 18px; }
+.item-note { font-size: 14px; }
+.item-total { font-size: 18px; width: 100px; }
+.qty { gap: 6px; }
+.qty button { width: 48px; height: 48px; font-size: 26px; border-radius: 10px; }
+.qty span { min-width: 34px; font-size: 22px; }
+
+.order-foot { gap: 12px; }
+.order-foot .input { font-size: 16px; padding: 11px 12px; }
+.order-foot .total { font-size: 34px; font-weight: 800; }
+.quick-pay { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.qp { min-height: 74px; border-radius: 14px; border: 0; background: #1e293b; color: #fff; font-size: 19px; font-weight: 700; padding: 8px; }
+.qp.cash { grid-column: 1 / -1; background: var(--ok); font-size: 24px; min-height: 84px; }
+.qp:hover:not(:disabled) { filter: brightness(1.12); }
+.qp:active:not(:disabled) { transform: scale(.97); }
+.qp:disabled { opacity: .35; cursor: not-allowed; }
+.big-btn { min-height: 56px; font-size: 16px; }
+.last-sale { font-size: 15px; justify-content: space-between; background: #f1f5f9; padding: 8px 12px; border-radius: 10px; }
+
+/* Modal de cobro también más grande */
+.pay-btn { padding: 22px 10px; font-size: 18px; }
+.cash-box .btn.sm { padding: 12px 16px; font-size: 16px; }
+.modal .btn.lg { padding: 18px 26px; font-size: 18px; }
+.chip { padding: 10px 16px; font-size: 15px; }
+
+@media (max-width: 1200px) {
+  .pos { grid-template-columns: 1fr 400px; }
+  .pos .grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+  .pos .prod-name { font-size: 19px; }
+  .qp { font-size: 16px; }
+}
+
+/* --- ajustes de velocidad: cobro compacto, avisos fuera de los botones --- */
+.toasts { right: auto; left: 230px; }
+.toast { font-size: 16px; }
+.catalog-top { align-items: stretch; }
+.catalog-top .last-sale { flex-shrink: 0; gap: 10px; display: flex; align-items: center; background: #fff; border: 1px solid var(--line); }
+.quick-pay { grid-template-columns: 1.25fr 1fr 1fr; }
+.qp.cash { grid-column: 1; grid-row: span 2; min-height: 0; }
+
+/* Pantallas chicas (1366x768): menú solo con íconos y cobro más compacto */
+@media (max-width: 1440px) {
+  .sidebar { width: 76px; padding: 12px 8px; }
+  .brand { font-size: 0; padding: 0 0 10px; text-align: center; }
+  .brand::before { content: '🍽'; font-size: 26px; }
+  .nav { justify-content: center; padding: 14px 0; position: relative; }
+  .nav .ico { font-size: 22px; }
+  .nav .lbl, .nav .key, .offline, .session small { display: none; }
+  .badge { position: absolute; top: 4px; right: 4px; }
+  .session { font-size: 0; text-align: center; padding: 10px 0; }
+  .session .dot { width: 14px; height: 14px; margin: 0; }
+  .toasts { left: 96px; }
+  .pos { grid-template-columns: 1fr 440px; }
+}
+@media (max-height: 860px) {
+  .order-head { padding: 10px 14px; gap: 8px; }
+  .order-head .seg button { padding: 9px 4px; }
+  .order-head .input { padding: 9px 12px; }
+  .order-foot { padding: 10px 14px; gap: 8px; }
+  .order-foot .total { font-size: 28px; }
+  .qp { min-height: 58px; font-size: 17px; }
+  .big-btn { min-height: 48px; }
+  .item { padding: 8px 0; }
+  .qty button { width: 44px; height: 44px; }
+  .pos .cat { padding: 10px 22px; min-height: 50px; }
+}

@@ -49,14 +49,27 @@ app.whenReady().then(async () => {
     return list.map((p) => ({ name: p.name, isDefault: p.isDefault }));
   });
 
+  // Cola de impresión: los trabajos salen de a uno y en orden, aunque se registren
+  // varias ventas seguidas. La venta nunca espera a la impresora.
+  let printQueue = Promise.resolve();
+  const enqueue = (job) => {
+    const p = printQueue.then(job, job);
+    printQueue = p.catch(() => {});
+    return p;
+  };
+
   ipcMain.handle('print:sale', async (_e, saleId, opts = {}) => {
     const settings = db.api.getSettings();
     const sale = db.api.getSale(saleId);
-    return printer.printSale(sale, settings, {
+    // Sin ticketera configurada no se abre la vista previa en cada venta (frenaría la caja).
+    if (!settings.printer_name && !opts.preview) {
+      return { ok: false, error: 'no hay ticketera configurada en Configuración' };
+    }
+    return enqueue(() => printer.printSale(sale, settings, {
       ticket: opts.ticket ?? settings.print_ticket === '1',
       comanda: opts.comanda ?? settings.print_comanda === '1',
-      preview: !!opts.preview || !settings.printer_name,
-    });
+      preview: !!opts.preview,
+    })).catch((e) => ({ ok: false, error: e.message }));
   });
 
   ipcMain.handle('print:close', async (_e, sessionId, opts = {}) => {
