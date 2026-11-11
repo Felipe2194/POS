@@ -18,6 +18,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 640,
     title: 'POS Comidas',
+    icon: path.join(__dirname, 'icon.png'),
     autoHideMenuBar: true,
     backgroundColor: '#0f172a',
     webPreferences: {
