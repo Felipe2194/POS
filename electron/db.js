@@ -16,16 +16,36 @@ const DEFAULT_SETTINGS = {
   print_ticket: '1', // ticket para el cliente
   print_comanda: '1', // comanda para cocina
   comanda_copies: '1',
+  ticket_font_scale: '1', // tamaño de letra del ticket (0.85 a 1.75)
+  comanda_font_scale: '1.25', // la comanda arranca un poco más grande
+  ticket_bold: '0',
+  comanda_bold: '1', // en térmicas la negrita se lee mejor desde la cocina
   auto_print: '1',
   admin_pin: '',
   payment_methods: JSON.stringify([
-    { id: 'efectivo', label: 'Efectivo', verify: false },
-    { id: 'transferencia', label: 'Transferencia', verify: true },
-    { id: 'mercadopago', label: 'Mercado Pago (QR)', verify: true },
-    { id: 'debito', label: 'Débito', verify: true },
-    { id: 'credito', label: 'Crédito', verify: true },
+    { id: 'efectivo', label: 'Efectivo', verify: false, active: true },
+    { id: 'transferencia', label: 'Transferencia', verify: true, active: true },
+    { id: 'mercadopago', label: 'Mercado Pago (QR)', verify: true, active: true },
+    { id: 'debito', label: 'Débito', verify: true, active: true },
+    { id: 'credito', label: 'Crédito', verify: true, active: true },
   ]),
+  // Pantalla de venta
+  order_types: JSON.stringify([
+    { id: 'mostrador', label: 'Mostrador', active: true },
+    { id: 'llevar', label: 'Para llevar', active: true },
+    { id: 'delivery', label: 'Delivery', active: true },
+    { id: 'mesa', label: 'Mesa', active: true },
+  ]),
+  default_order_type: 'mostrador',
+  ask_customer: 'optional', // hidden | optional | required
+  show_notes: '1',
+  show_discount: '1',
+  allow_custom_item: '1',
+  quick_notes: JSON.stringify(['Sin sal', 'Sin cebolla', 'Sin mayonesa', 'Bien cocido', 'Para llevar', 'Extra queso']),
+  tile_size: 'grande', // normal | grande | extra
+  ui_zoom: '1',
 };
+const JSON_KEYS = ['payment_methods', 'order_types', 'quick_notes'];
 
 function init(userDataDir) {
   const dataDir = path.join(userDataDir, 'data');
@@ -168,7 +188,11 @@ function getSettings() {
   const rows = db.prepare('SELECT key, value FROM settings').all();
   const s = {};
   for (const r of rows) s[r.key] = r.value;
-  try { s.payment_methods = JSON.parse(s.payment_methods); } catch { s.payment_methods = JSON.parse(DEFAULT_SETTINGS.payment_methods); }
+  for (const k of JSON_KEYS) {
+    try { s[k] = JSON.parse(s[k]); } catch { s[k] = JSON.parse(DEFAULT_SETTINGS[k]); }
+  }
+  // compatibilidad: medios de pago creados antes del flag "active"
+  s.payment_methods = s.payment_methods.map((m) => ({ ...m, active: m.active !== false }));
   return s;
 }
 function saveSettings(obj) {

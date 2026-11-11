@@ -63,7 +63,7 @@ export default function Productos() {
                 </label>
               </td>
               <td className="r nowrap">
-                <button className="link" onClick={() => setEditP(p)}>Editar</button>
+                <button className="btn ghost sm" onClick={() => setEditP(p)}>Editar</button>
               </td>
             </tr>
           ))}

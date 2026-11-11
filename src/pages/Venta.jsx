@@ -1,15 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { api, money, parseNum, ORDER_TYPES, useApp } from '../lib.js';
+import { api, money, parseNum, useApp } from '../lib.js';
 import { Modal } from '../components.jsx';
 
 export default function Venta() {
   const { session, settings, toast, refresh, go } = useApp();
+  const orderTypes = (settings.order_types || []).filter((t) => t.active !== false);
+  const defaultType = orderTypes.find((t) => t.id === settings.default_order_type)?.id || orderTypes[0]?.id || 'mostrador';
+  const payMethods = settings.payment_methods.filter((m) => m.active !== false);
+  const askCustomer = settings.ask_customer || 'optional';
+  const customerRef = useRef();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [cat, setCat] = useState('all');
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState([]);
-  const [orderType, setOrderType] = useState('mostrador');
+  const [orderType, setOrderType] = useState(defaultType);
   const [customer, setCustomer] = useState('');
   const [notes, setNotes] = useState('');
   const [discount, setDiscount] = useState('');
@@ -49,7 +54,7 @@ export default function Venta() {
     });
   };
   const setQty = (key, qty) => setCart((c) => (qty <= 0 ? c.filter((i) => i.key !== key) : c.map((i) => (i.key === key ? { ...i, qty } : i))));
-  const clear = () => { setCart([]); setCustomer(''); setNotes(''); setDiscount(''); setOrderType('mostrador'); };
+  const clear = () => { setCart([]); setCustomer(''); setNotes(''); setDiscount(''); setOrderType(defaultType); };
 
   const [saving, setSaving] = useState(false);
 
@@ -67,6 +72,12 @@ export default function Venta() {
 
   const register = async (payments, cash) => {
     if (saving) return; // evita doble registro por doble toque
+    if (askCustomer === 'required' && !customer.trim()) {
+      toast('Falta el nombre del cliente', 'error');
+      setPaying(false);
+      customerRef.current?.focus();
+      return;
+    }
     setSaving(true);
     try {
       const sale = await api.db('createSale', {
@@ -93,7 +104,7 @@ export default function Venta() {
   }
 
   return (
-    <div className="pos">
+    <div className={'pos tiles-' + (settings.tile_size || 'grande')}>
       <section className="catalog">
         {settings.auto_print === '1' && !settings.printer_name && (
           <div className="alert warn row between">
@@ -103,7 +114,7 @@ export default function Venta() {
         )}
         <div className="catalog-top">
           <input ref={searchRef} className="input" placeholder="Buscar producto (F8)…" value={search} onChange={(e) => setSearch(e.target.value)} />
-          <button className="btn ghost" onClick={() => setCustom(true)}>+ Ítem libre</button>
+          {settings.allow_custom_item !== '0' && <button className="btn ghost" onClick={() => setCustom(true)}>+ Ítem libre</button>}
           {lastSale && (
             <div className="last-sale">
               <span>Último: <b>#{lastSale.number}</b> {money(lastSale.total)}</span>
@@ -129,14 +140,22 @@ export default function Venta() {
       </section>
 
       <section className="order">
-        <div className="order-head">
-          <div className="seg">
-            {ORDER_TYPES.map((t) => (
-              <button key={t.id} className={orderType === t.id ? 'active' : ''} onClick={() => setOrderType(t.id)}>{t.label}</button>
-            ))}
+        {(orderTypes.length > 1 || askCustomer !== 'hidden') && (
+          <div className="order-head">
+            {orderTypes.length > 1 && (
+              <div className="seg">
+                {orderTypes.map((t) => (
+                  <button key={t.id} className={orderType === t.id ? 'active' : ''} onClick={() => setOrderType(t.id)}>{t.label}</button>
+                ))}
+              </div>
+            )}
+            {askCustomer !== 'hidden' && (
+              <input ref={customerRef} className={'input ' + (askCustomer === 'required' && cart.length && !customer.trim() ? 'required' : '')}
+                placeholder={(orderType === 'mesa' ? 'N° de mesa' : 'Nombre del cliente') + (askCustomer === 'required' ? ' (obligatorio)' : ' (opcional)')}
+                value={customer} onChange={(e) => setCustomer(e.target.value)} />
+            )}
           </div>
-          <input className="input" placeholder={orderType === 'mesa' ? 'N° de mesa' : 'Nombre del cliente (opcional)'} value={customer} onChange={(e) => setCustomer(e.target.value)} />
-        </div>
+        )}
 
         <div className="items">
           {!cart.length && <div className="muted center pad">Tocá un producto para agregarlo</div>}
@@ -158,13 +177,15 @@ export default function Venta() {
         </div>
 
         <div className="order-foot">
-          <div className="row gap">
-            <input className="input grow" placeholder="Obs. cocina (sin sal…)" value={notes} onChange={(e) => setNotes(e.target.value)} />
-            <input className="input right" style={{ width: 110 }} value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="Desc. $" title="Descuento en pesos" />
-          </div>
+          {(settings.show_notes !== '0' || settings.show_discount !== '0') && (
+            <div className="row gap">
+              {settings.show_notes !== '0' && <input className="input grow" placeholder="Obs. cocina (sin sal…)" value={notes} onChange={(e) => setNotes(e.target.value)} />}
+              {settings.show_discount !== '0' && <input className={'input right ' + (settings.show_notes === '0' ? 'grow' : '')} style={{ width: 120 }} value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="Desc. $" title="Descuento en pesos" />}
+            </div>
+          )}
           <div className="row between total"><span>TOTAL</span><span>{money(total)}</span></div>
-          <div className="quick-pay">
-            {settings.payment_methods.map((m) => (
+          <div className={'quick-pay ' + (payMethods.some((m) => m.id === 'efectivo') && payMethods.length >= 3 ? 'with-cash' : '')}>
+            {payMethods.map((m) => (
               <button key={m.id} className={'qp ' + (m.id === 'efectivo' ? 'cash' : '')} disabled={!cart.length || saving} onClick={() => quickPay(m.id)}>
                 {m.label}
               </button>
@@ -208,8 +229,8 @@ export const cleanErr = (e) => String(e?.message || e).replace(/^Error invoking 
 
 function PayModal({ total, onClose, onConfirm }) {
   const { settings } = useApp();
-  const methods = settings.payment_methods;
-  const [lines, setLines] = useState([{ method: 'efectivo', amount: total, reference: '' }]);
+  const methods = settings.payment_methods.filter((m) => m.active !== false);
+  const [lines, setLines] = useState([{ method: methods[0]?.id || 'efectivo', amount: total, reference: '' }]);
   const [mixed, setMixed] = useState(false);
   const [received, setReceived] = useState('');
   const [busy, setBusy] = useState(false);
@@ -300,8 +321,9 @@ function PayModal({ total, onClose, onConfirm }) {
 }
 
 function ItemModal({ item, onClose, onSave, onRemove }) {
+  const { settings } = useApp();
   const [it, setIt] = useState(item);
-  const quick = ['Sin sal', 'Sin cebolla', 'Sin mayonesa', 'Bien cocido', 'Para llevar', 'Extra queso'];
+  const quick = settings.quick_notes || [];
   return (
     <Modal title={item.name} onClose={onClose} small>
       <label>Nota para cocina</label>

@@ -49,8 +49,8 @@ export default function Caja() {
               <td className={'r ' + (h.difference < 0 ? 'bad-text' : h.difference > 0 ? 'ok-text' : '')}>{h.difference != null ? money(h.difference) : '—'}</td>
               <td><StatusPill status={h.status} /></td>
               <td className="r">
-                <button className="link" onClick={async () => setViewing(await api.db('sessionSummary', h.id))}>Ver</button>{' '}
-                <button className="link" onClick={() => api.printClose(h.id)}>Imprimir</button>
+                <button className="btn ghost sm" onClick={async () => setViewing(await api.db('sessionSummary', h.id))}>Ver</button>{' '}
+                <button className="btn ghost sm" onClick={() => api.printClose(h.id)}>Imprimir</button>
               </td>
             </tr>
           ))}

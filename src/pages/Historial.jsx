@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, money, fmtDateTime, today, toCsv, ORDER_TYPES, VERIFY_LABELS, useApp } from '../lib.js';
+import { api, money, fmtDateTime, today, toCsv, VERIFY_LABELS, useApp } from '../lib.js';
 import { Modal, Stat, StatusPill } from '../components.jsx';
 import { cleanErr } from './Venta.jsx';
 
@@ -28,7 +28,7 @@ export default function Historial() {
     const csv = toCsv(rows, [
       { label: 'Fecha', get: (r) => fmtDateTime(r.created_at) },
       { label: 'Pedido', get: (r) => r.number },
-      { label: 'Tipo', get: (r) => r.order_type },
+      { label: 'Tipo', get: (r) => settings.order_types.find((t) => t.id === r.order_type)?.label || r.order_type },
       { label: 'Cliente', get: (r) => r.customer },
       { label: 'Detalle', get: (r) => r.detail },
       { label: 'Medios de pago', get: (r) => (r.methods || '').split(',').map((m) => labels[m] || m).join(' + ') },
@@ -104,7 +104,7 @@ export default function Historial() {
         <Modal title={`Pedido #${detail.number} — ${fmtDateTime(detail.created_at)}`} onClose={() => setDetail(null)}>
           <div className="row gap mb">
             <StatusPill status={detail.status} />
-            <span>{ORDER_TYPES.find((t) => t.id === detail.order_type)?.label}</span>
+            <span>{settings.order_types.find((t) => t.id === detail.order_type)?.label || detail.order_type}</span>
             {detail.customer && <b>{detail.customer}</b>}
             <span className="muted">Caja #{detail.session_id}</span>
           </div>

@@ -44,6 +44,7 @@ export default function App() {
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => { if (settings) api.setZoom(settings.ui_zoom); }, [settings?.ui_zoom]);
 
   // Pide el PIN de administrador (si está configurado). Devuelve el PIN o null.
   const askPin = useCallback((reason) => {

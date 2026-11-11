@@ -68,9 +68,9 @@ export default function Pagos() {
               <td className="r b">{money(r.amount)}</td>
               <td><StatusPill status={r.verify_status} />{r.verified_at && <div className="muted small">{fmtDateTime(r.verified_at)}</div>}</td>
               <td className="r nowrap">
-                {r.verify_status !== 'verificado' && <button className="btn ok sm" onClick={() => set(r, 'verificado')}>✓ Llegó</button>}{' '}
-                {r.verify_status !== 'rechazado' && <button className="btn danger ghost sm" onClick={() => set(r, 'rechazado')}>✕ No llegó</button>}{' '}
-                {r.verify_status !== 'pendiente' && <button className="btn ghost sm" onClick={() => set(r, 'pendiente')}>Deshacer</button>}
+                {r.verify_status !== 'verificado' && <button className="btn ok" onClick={() => set(r, 'verificado')}>✓ Llegó</button>}{' '}
+                {r.verify_status !== 'rechazado' && <button className="btn danger ghost" onClick={() => set(r, 'rechazado')}>✕ No llegó</button>}{' '}
+                {r.verify_status !== 'pendiente' && <button className="btn ghost" onClick={() => set(r, 'pendiente')}>Deshacer</button>}
               </td>
             </tr>
           ))}

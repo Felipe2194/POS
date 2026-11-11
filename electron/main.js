@@ -82,6 +82,12 @@ app.whenReady().then(async () => {
     return printer.printTest(settings, { preview: !!opts.preview || !settings.printer_name });
   });
 
+  ipcMain.handle('print:sample', async (_e, partialSettings, kind, opts = {}) => {
+    const settings = { ...db.api.getSettings(), ...partialSettings };
+    const preview = !!opts.preview || !settings.printer_name;
+    return preview ? printer.printSample(settings, kind, { preview }) : enqueue(() => printer.printSample(settings, kind, {}));
+  });
+
   ipcMain.handle('backup:save', async () => {
     const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
     const { canceled, filePath } = await dialog.showSaveDialog(win, {

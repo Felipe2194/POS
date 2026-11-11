@@ -6,27 +6,36 @@ const money = (n) =>
   '$ ' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const fmtDate = (iso) => new Date(iso).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
-const ORDER_TYPES = { mostrador: 'MOSTRADOR', llevar: 'PARA LLEVAR', delivery: 'DELIVERY', mesa: 'MESA' };
+const orderLabel = (settings, id) => esc(((settings.order_types || []).find((t) => t.id === id)?.label || id || '').toUpperCase());
 
-function baseCss(widthMm) {
+function baseCss(widthMm, { scale = 1, bold = false } = {}) {
   // Ancho imprimible típico: 80mm -> ~72mm, 58mm -> ~48mm
   const printable = widthMm >= 80 ? 72 : 48;
-  const fs = widthMm >= 80 ? 12 : 10;
+  const fs = Math.round((widthMm >= 80 ? 12 : 10) * scale);
+  // Tope para títulos grandes: que "TOTAL $ 126.000" (~16 caracteres monoespaciados)
+  // y "PEDIDO #123" (~11) entren en una línea del ancho imprimible.
+  const printablePx = (printable / 25.4) * 96;
+  const big = Math.min(Math.round(fs * 1.5), Math.floor(printablePx / (16 * 0.62)));
+  const xl = Math.min(Math.round(fs * 2.15), Math.floor(printablePx / (11 * 0.62)));
   return `
     @page { margin: 0; size: ${widthMm}mm auto; }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: #fff; color: #000; }
-    body { width: ${printable}mm; margin: 0 auto; padding: 2mm 0 6mm; font-family: 'Courier New', monospace; font-size: ${fs}px; line-height: 1.25; }
-    .c { text-align: center; } .r { text-align: right; } .b { font-weight: bold; }
-    .big { font-size: ${fs + 6}px; font-weight: bold; } .xl { font-size: ${fs + 14}px; font-weight: bold; }
+    body { width: ${printable}mm; margin: 0 auto; padding: 2mm 0 6mm; font-family: 'Courier New', monospace; font-size: ${fs}px; line-height: 1.25; font-weight: ${bold ? 'bold' : 'normal'}; }
+    .c { text-align: center; } .r { text-align: right; white-space: nowrap; padding-left: 4px; } .b { font-weight: bold; }
+    body { overflow-wrap: anywhere; overflow-x: hidden; }
+    .big { font-size: ${big}px; font-weight: bold; } .xl { font-size: ${xl}px; font-weight: bold; }
     hr { border: 0; border-top: 1px dashed #000; margin: 4px 0; }
     table { width: 100%; border-collapse: collapse; } td { vertical-align: top; padding: 1px 0; }
     .note { font-style: italic; padding-left: 8px; }
     .inv { background: #000; color: #fff; padding: 2px 4px; display: inline-block; }
   `;
 }
-const wrap = (widthMm, body) =>
-  `<!doctype html><html><head><meta charset="utf-8"><style>${baseCss(widthMm)}</style></head><body>${body}</body></html>`;
+// Estilo configurable: tamaño de letra (escala) y negrita, por separado para ticket y comanda
+const ticketStyle = (s) => ({ scale: Number(s.ticket_font_scale) || 1, bold: s.ticket_bold === '1' });
+const comandaStyle = (s) => ({ scale: Number(s.comanda_font_scale) || 1, bold: s.comanda_bold === '1' });
+const wrap = (widthMm, style, body) =>
+  `<!doctype html><html><head><meta charset="utf-8"><style>${baseCss(widthMm, style)}</style></head><body>${body}</body></html>`;
 
 function payLabel(settings, id) {
   return (settings.payment_methods || []).find((m) => m.id === id)?.label || id;
@@ -38,13 +47,13 @@ function ticketHtml(sale, settings) {
     <tr><td>${i.qty} x ${esc(i.name)}</td><td class="r">${money(i.qty * i.price)}</td></tr>
     ${i.notes ? `<tr><td colspan="2" class="note">* ${esc(i.notes)}</td></tr>` : ''}`).join('');
   const pays = sale.payments.map((p) => `<tr><td>${esc(payLabel(settings, p.method))}</td><td class="r">${money(p.amount)}</td></tr>`).join('');
-  return wrap(w, `
+  return wrap(w, ticketStyle(settings), `
     <div class="c big">${esc(settings.business_name)}</div>
     ${settings.business_address ? `<div class="c">${esc(settings.business_address)}</div>` : ''}
     ${settings.business_phone ? `<div class="c">Tel: ${esc(settings.business_phone)}</div>` : ''}
     <hr>
     <div class="c xl">PEDIDO #${sale.number}</div>
-    <div class="c">${ORDER_TYPES[sale.order_type] || ''}${sale.customer ? ' - ' + esc(sale.customer) : ''}</div>
+    <div class="c">${orderLabel(settings, sale.order_type)}${sale.customer ? ' - ' + esc(sale.customer) : ''}</div>
     <div class="c">${fmtDate(sale.created_at)}</div>
     ${sale.status === 'anulada' ? '<div class="c big inv">ANULADA</div>' : ''}
     <hr>
@@ -70,10 +79,10 @@ function comandaHtml(sale, settings) {
   const rows = sale.items.map((i) => `
     <div class="big">${i.qty} x ${esc(i.name)}</div>
     ${i.notes ? `<div class="note big">→ ${esc(i.notes)}</div>` : ''}`).join('');
-  return wrap(w, `
+  return wrap(w, comandaStyle(settings), `
     <div class="c b">COMANDA COCINA</div>
     <div class="c xl">#${sale.number}</div>
-    <div class="c big">${ORDER_TYPES[sale.order_type] || ''}</div>
+    <div class="c big">${orderLabel(settings, sale.order_type)}</div>
     ${sale.customer ? `<div class="c big">${esc(sale.customer)}</div>` : ''}
     <div class="c">${fmtDate(sale.created_at)}</div>
     <hr>
@@ -92,7 +101,7 @@ function closeHtml(sum, settings) {
       ${m.rechazado > 0 ? `<tr><td class="note">rechazado</td><td class="r">${money(m.rechazado)}</td></tr>` : ''}`).join('');
   const movs = sum.movements.map((m) => `<tr><td>${m.type === 'ingreso' ? '+' : '-'} ${esc(m.reason)}</td><td class="r">${money(m.amount)}</td></tr>`).join('');
   const prods = sum.topProducts.map((p) => `<tr><td>${p.qty} x ${esc(p.name)}</td><td class="r">${money(p.total)}</td></tr>`).join('');
-  return wrap(w, `
+  return wrap(w, ticketStyle(settings), `
     <div class="c big">${esc(settings.business_name)}</div>
     <div class="c b">${s.status === 'cerrada' ? 'CIERRE DE CAJA' : 'ESTADO DE CAJA (PARCIAL)'} #${s.id}</div>
     <hr>
@@ -172,7 +181,29 @@ async function printClose(summary, settings, opts = {}) {
 
 async function printTest(settings, opts = {}) {
   const w = Number(settings.paper_width) || 80;
-  return printHtml(wrap(w, `<div class="c big">${esc(settings.business_name)}</div><hr><div class="c">Prueba de impresión OK</div><div class="c">Papel ${w}mm</div><div class="c">${fmtDate(new Date().toISOString())}</div>`), settings, opts);
+  return printHtml(wrap(w, ticketStyle(settings), `<div class="c big">${esc(settings.business_name)}</div><hr><div class="c">Prueba de impresión OK</div><div class="c">Papel ${w}mm</div><div class="c">${fmtDate(new Date().toISOString())}</div>`), settings, opts);
 }
 
-module.exports = { printSale, printClose, printTest };
+// Pedido de ejemplo para probar tamaños de letra sin registrar una venta
+function sampleSale(settings) {
+  const types = (settings.order_types || []).filter((t) => t.active !== false);
+  const method = (settings.payment_methods || []).find((m) => m.active !== false)?.id || 'efectivo';
+  return {
+    number: 27, order_type: types[1]?.id || types[0]?.id || 'mostrador', customer: 'Juan', status: 'ok',
+    created_at: new Date().toISOString(), notes: 'Llamar al salir',
+    items: [
+      { qty: 2, name: 'Milanesa con papas fritas', price: 9500, notes: 'sin sal' },
+      { qty: 1, name: 'Gaseosa 500ml', price: 2500, notes: '' },
+      { qty: 3, name: 'Empanada de carne', price: 1500, notes: '' },
+    ],
+    subtotal: 26000, discount: 0, total: 26000,
+    payments: [{ method, amount: 26000 }], cash_received: null, change_given: null,
+  };
+}
+
+async function printSample(settings, kind, opts = {}) {
+  const sale = sampleSale(settings);
+  return printHtml(kind === 'comanda' ? comandaHtml(sale, settings) : ticketHtml(sale, settings), settings, opts);
+}
+
+module.exports = { printSale, printClose, printTest, printSample };
