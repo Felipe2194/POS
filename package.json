@@ -1,0 +1,50 @@
+{
+  "name": "pos-comidas",
+  "version": "1.0.0",
+  "description": "Sistema POS offline para venta de comidas",
+  "main": "electron/main.js",
+  "author": "",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env VITE_DEV=1 electron .\"",
+    "build": "vite build",
+    "start": "vite build && electron .",
+    "rebuild": "electron-rebuild -f -w better-sqlite3",
+    "postinstall": "electron-builder install-app-deps",
+    "dist": "vite build && electron-builder --win"
+  },
+  "build": {
+    "appId": "com.poscomidas.app",
+    "productName": "POS Comidas",
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.1",
+    "@vitejs/plugin-react": "^4.5.2",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12",
+    "vite": "^6.3.5",
+    "wait-on": "^8.0.3"
+  }
+}
