@@ -1,9 +1,9 @@
 {
   "name": "pos-comidas",
   "version": "1.2.0",
-  "description": "Sistema POS offline para venta de comidas",
+  "description": "Sistema de ventas offline para festivales y eventos de comida",
   "main": "electron/main.js",
-  "author": "",
+  "author": "POS Comidas",
   "license": "UNLICENSED",
   "scripts": {
     "dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env VITE_DEV=1 electron .\"",
@@ -25,12 +25,31 @@
       "output": "release"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
-    }
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "language": "3082",
+      "installerLanguages": [
+        "es_ES"
+      ],
+      "multiLanguageInstaller": false,
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/installerSidebar.bmp",
+      "installerHeader": "build/installerHeader.bmp",
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "POS Comidas",
+      "uninstallDisplayName": "POS Comidas",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "Instalar-POS-Comidas-${version}.${ext}"
+    },
+    "copyright": "POS Comidas"
   },
   "dependencies": {
     "better-sqlite3": "^12.2.0",
