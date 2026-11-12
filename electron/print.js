@@ -6,7 +6,6 @@ const money = (n) =>
   '$ ' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const fmtDate = (iso) => new Date(iso).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
-const orderLabel = (settings, id) => esc(((settings.order_types || []).find((t) => t.id === id)?.label || id || '').toUpperCase());
 
 function baseCss(widthMm, { scale = 1, bold = false } = {}) {
   // Ancho imprimible típico: 80mm -> ~72mm, 58mm -> ~48mm
@@ -53,7 +52,7 @@ function ticketHtml(sale, settings) {
     ${settings.business_phone ? `<div class="c">Tel: ${esc(settings.business_phone)}</div>` : ''}
     <hr>
     <div class="c xl">PEDIDO #${sale.number}</div>
-    <div class="c">${orderLabel(settings, sale.order_type)}${sale.customer ? ' - ' + esc(sale.customer) : ''}</div>
+    ${sale.customer ? `<div class="c big">${esc(sale.customer)}</div>` : ''}
     <div class="c">${fmtDate(sale.created_at)}</div>
     ${sale.status === 'anulada' ? '<div class="c big inv">ANULADA</div>' : ''}
     <hr>
@@ -82,7 +81,6 @@ function comandaHtml(sale, settings) {
   return wrap(w, comandaStyle(settings), `
     <div class="c b">COMANDA COCINA</div>
     <div class="c xl">#${sale.number}</div>
-    <div class="c big">${orderLabel(settings, sale.order_type)}</div>
     ${sale.customer ? `<div class="c big">${esc(sale.customer)}</div>` : ''}
     <div class="c">${fmtDate(sale.created_at)}</div>
     <hr>
@@ -186,10 +184,9 @@ async function printTest(settings, opts = {}) {
 
 // Pedido de ejemplo para probar tamaños de letra sin registrar una venta
 function sampleSale(settings) {
-  const types = (settings.order_types || []).filter((t) => t.active !== false);
   const method = (settings.payment_methods || []).find((m) => m.active !== false)?.id || 'efectivo';
   return {
-    number: 27, order_type: types[1]?.id || types[0]?.id || 'mostrador', customer: 'Juan', status: 'ok',
+    number: 27, order_type: 'mostrador', customer: 'Juan', status: 'ok',
     created_at: new Date().toISOString(), notes: 'Llamar al salir',
     items: [
       { qty: 2, name: 'Milanesa con papas fritas', price: 9500, notes: 'sin sal' },

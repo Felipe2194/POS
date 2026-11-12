@@ -30,12 +30,12 @@ export default function Pagos() {
   const sumBy = (st) => rows.filter((r) => r.verify_status === st).reduce((a, r) => a + r.amount, 0);
 
   return (
-    <div className="page">
+    <div className="page big-page">
       <div className="page-head"><h1>Verificar pagos</h1></div>
-      <p className="muted">Revisá en el homebanking o en la app de cobro que cada transferencia haya llegado y marcala. Los pagos rechazados quedan registrados para reclamar.</p>
+      <p className="muted lead">Revisá en el homebanking o en la app de cobro que cada transferencia haya llegado y marcala. Los pagos rechazados quedan registrados para reclamar.</p>
 
       <div className="filters">
-        <div className="seg">
+        <div className="seg big">
           {['pendiente', 'verificado', 'rechazado', 'todos'].map((s) => (
             <button key={s} className={status === s ? 'active' : ''} onClick={() => setStatus(s)}>{s[0].toUpperCase() + s.slice(1)}</button>
           ))}
@@ -55,7 +55,7 @@ export default function Pagos() {
         {(status === 'rechazado' || status === 'todos') && <Stat label="Rechazado" value={money(sumBy('rechazado'))} tone="bad" />}
       </div>
 
-      <table className="table mt">
+      <table className="table big pay-table mt">
         <thead><tr><th>Fecha</th><th>Pedido</th><th>Cliente</th><th>Medio</th><th>Referencia</th><th className="r">Monto</th><th>Estado</th><th className="r">Acciones</th></tr></thead>
         <tbody>
           {rows.map((r) => (
@@ -68,9 +68,11 @@ export default function Pagos() {
               <td className="r b">{money(r.amount)}</td>
               <td><StatusPill status={r.verify_status} />{r.verified_at && <div className="muted small">{fmtDateTime(r.verified_at)}</div>}</td>
               <td className="r nowrap">
-                {r.verify_status !== 'verificado' && <button className="btn ok" onClick={() => set(r, 'verificado')}>✓ Llegó</button>}{' '}
-                {r.verify_status !== 'rechazado' && <button className="btn danger ghost" onClick={() => set(r, 'rechazado')}>✕ No llegó</button>}{' '}
-                {r.verify_status !== 'pendiente' && <button className="btn ghost" onClick={() => set(r, 'pendiente')}>Deshacer</button>}
+                <div className="pay-actions">
+                  {r.verify_status !== 'verificado' && <button className="btn ok xl" onClick={() => set(r, 'verificado')}>✓ Llegó</button>}
+                  {r.verify_status !== 'rechazado' && <button className="btn danger xl" onClick={() => set(r, 'rechazado')}>✕ No llegó</button>}
+                  {r.verify_status !== 'pendiente' && <button className="btn ghost lg" onClick={() => set(r, 'pendiente')}>Deshacer</button>}
+                </div>
               </td>
             </tr>
           ))}
@@ -85,7 +87,7 @@ export default function Pagos() {
             <input className="input" autoFocus value={rejecting.note} onChange={(e) => setRejecting({ ...rejecting, note: e.target.value })} />
             <div className="row end gap mt">
               <button type="button" className="btn ghost" onClick={() => setRejecting(null)}>Cancelar</button>
-              <button className="btn danger">Marcar rechazado</button>
+              <button className="btn danger lg">Marcar rechazado</button>
             </div>
           </form>
         </Modal>

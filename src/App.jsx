@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, AppCtx, money } from './lib.js';
 import { Modal } from './components.jsx';
+import logo from './logo.svg';
 import Venta from './pages/Venta.jsx';
 import Caja from './pages/Caja.jsx';
 import Pagos from './pages/Pagos.jsx';
@@ -24,6 +25,7 @@ export default function App() {
   const [pending, setPending] = useState(0);
   const [toasts, setToasts] = useState([]);
   const [pinAsk, setPinAsk] = useState(null);
+  const [collapsed, setCollapsed] = useState(false);
   const unlocked = useRef(false);
 
   const toast = useCallback((msg, type = 'ok') => {
@@ -45,6 +47,13 @@ export default function App() {
 
   useEffect(() => { refresh(); }, [refresh]);
   useEffect(() => { if (settings) api.setZoom(settings.ui_zoom); }, [settings?.ui_zoom]);
+  // se recuerda si la barra quedó colapsada
+  useEffect(() => { if (settings) setCollapsed(settings.sidebar_collapsed === '1'); }, [settings?.sidebar_collapsed]);
+  const toggleSidebar = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    api.db('saveSettings', { sidebar_collapsed: next ? '1' : '0' });
+  };
 
   // Pide el PIN de administrador (si está configurado). Devuelve el PIN o null.
   const askPin = useCallback((reason) => {
@@ -84,9 +93,13 @@ export default function App() {
 
   return (
     <AppCtx.Provider value={ctx}>
-      <div className="app">
+      <div className={'app ' + (collapsed ? 'collapsed' : '')}>
         <aside className="sidebar">
-          <div className="brand">{settings.business_name}</div>
+          <button className="brand" onClick={toggleSidebar} title={collapsed ? 'Mostrar menú' : 'Ocultar menú'}>
+            <img src={logo} alt="" className="logo" />
+            <span className="brand-name">{settings.business_name}</span>
+            <span className="brand-arrow">{collapsed ? '»' : '«'}</span>
+          </button>
           <nav>
             {PAGES.map((p) => (
               <button key={p.id} title={p.label} className={'nav ' + (page === p.id ? 'active' : '')} onClick={() => go(p.id)}>
@@ -97,18 +110,21 @@ export default function App() {
               </button>
             ))}
           </nav>
-          <div className={'session ' + (session ? 'open' : 'closed')} onClick={() => go('caja')}>
-            {session ? (
-              <>
-                <div className="dot" /> Caja abierta #{session.id}
-                <small>{session.opened_by} · fondo {money(session.opening_amount)}</small>
-              </>
-            ) : (
-              <>
-                <div className="dot" /> Caja cerrada
-                <small>Abrí la caja para vender</small>
-              </>
-            )}
+          <div className={'session ' + (session ? 'open' : 'closed')} onClick={() => go('caja')} title={session ? 'Caja abierta' : 'Caja cerrada'}>
+            <div className="dot" />
+            <span className="session-txt">
+              {session ? (
+                <>
+                  Caja abierta #{session.id}
+                  <small>{session.opened_by} · fondo {money(session.opening_amount)}</small>
+                </>
+              ) : (
+                <>
+                  Caja cerrada
+                  <small>Abrí la caja para vender</small>
+                </>
+              )}
+            </span>
           </div>
           <div className="offline">● Modo local (sin internet)</div>
         </aside>

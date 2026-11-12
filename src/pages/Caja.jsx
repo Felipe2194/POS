@@ -18,15 +18,15 @@ export default function Caja() {
   useEffect(() => { load(); }, [session]);
 
   return (
-    <div className="page">
+    <div className="page big-page">
       <div className="page-head">
         <h1>Caja</h1>
         {session && (
-          <div className="row gap">
-            <button className="btn ghost" onClick={() => setMov('ingreso')}>+ Ingreso</button>
-            <button className="btn ghost" onClick={() => setMov('egreso')}>− Egreso / Retiro</button>
-            <button className="btn ghost" onClick={() => api.printClose(session.id)}>Imprimir parcial</button>
-            <button className="btn danger" onClick={() => setClosing(true)}>Cerrar caja</button>
+          <div className="row gap wrap">
+            <button className="btn ghost lg" onClick={() => setMov('ingreso')}>+ Ingreso</button>
+            <button className="btn ghost lg" onClick={() => setMov('egreso')}>− Egreso / Retiro</button>
+            <button className="btn ghost lg" onClick={() => api.printClose(session.id)}>🖨 Imprimir parcial</button>
+            <button className="btn danger lg" onClick={() => setClosing(true)}>Cerrar caja</button>
           </div>
         )}
       </div>
@@ -34,7 +34,7 @@ export default function Caja() {
       {!session ? <OpenForm onOpened={() => { refresh(); toast('Caja abierta'); }} /> : summary && <SummaryView sum={summary} />}
 
       <h2 className="mt-l">Historial de cajas</h2>
-      <table className="table">
+      <table className="table big">
         <thead><tr><th>#</th><th>Apertura</th><th>Cierre</th><th>Cajero</th><th className="r">Ventas</th><th className="r">Esperado</th><th className="r">Contado</th><th className="r">Diferencia</th><th>Estado</th><th></th></tr></thead>
         <tbody>
           {history.map((h) => (
@@ -49,8 +49,8 @@ export default function Caja() {
               <td className={'r ' + (h.difference < 0 ? 'bad-text' : h.difference > 0 ? 'ok-text' : '')}>{h.difference != null ? money(h.difference) : '—'}</td>
               <td><StatusPill status={h.status} /></td>
               <td className="r">
-                <button className="btn ghost sm" onClick={async () => setViewing(await api.db('sessionSummary', h.id))}>Ver</button>{' '}
-                <button className="btn ghost sm" onClick={() => api.printClose(h.id)}>Imprimir</button>
+                <button className="btn ghost" onClick={async () => setViewing(await api.db('sessionSummary', h.id))}>Ver</button>{' '}
+                <button className="btn ghost" onClick={() => api.printClose(h.id)}>Imprimir</button>
               </td>
             </tr>
           ))}
@@ -109,17 +109,29 @@ export function SummaryView({ sum }) {
         Abierta {fmtDateTime(s.opened_at)} por {s.opened_by || '—'}
         {s.closed_at && <> · Cerrada {fmtDateTime(s.closed_at)} por {s.closed_by || '—'}</>}
       </div>
-      <div className="stats">
-        <Stat label="Total vendido" value={money(sum.totals.total)} sub={`${sum.totals.n} ventas`} tone="primary" />
-        <Stat label="Efectivo esperado en caja" value={money(sum.expectedCash)} sub={`fondo ${money(s.opening_amount)} + ventas ${money(sum.cashSales)} + ing. ${money(sum.ingresos)} − egr. ${money(sum.egresos)}`} />
-        {s.status === 'cerrada' && <Stat label="Diferencia de arqueo" value={money(s.difference)} tone={s.difference < 0 ? 'bad' : s.difference > 0 ? 'ok' : ''} sub={`contado ${money(s.counted_cash)}`} />}
-        {sum.voided.n > 0 && <Stat label="Anuladas" value={sum.voided.n} sub={money(sum.voided.total)} tone="bad" />}
+      <div className="hero-stats">
+        <div className="hero cash">
+          <div className="hero-label">💵 Efectivo en caja</div>
+          <div className="hero-value">{money(sum.expectedCash)}</div>
+          <div className="hero-sub">fondo {money(s.opening_amount)} + ventas {money(sum.cashSales)} + ing. {money(sum.ingresos)} − egr. {money(sum.egresos)}</div>
+        </div>
+        <div className="hero total">
+          <div className="hero-label">🧾 Total vendido</div>
+          <div className="hero-value">{money(sum.totals.total)}</div>
+          <div className="hero-sub">{sum.totals.n} ventas{sum.totals.n ? ` · promedio ${money(sum.totals.total / sum.totals.n)}` : ''}</div>
+        </div>
       </div>
+      {(s.status === 'cerrada' || sum.voided.n > 0) && (
+        <div className="stats mt">
+          {s.status === 'cerrada' && <Stat label="Diferencia de arqueo" value={money(s.difference)} tone={s.difference < 0 ? 'bad' : s.difference > 0 ? 'ok' : ''} sub={`contado ${money(s.counted_cash)}`} />}
+          {sum.voided.n > 0 && <Stat label="Anuladas" value={sum.voided.n} sub={money(sum.voided.total)} tone="bad" />}
+        </div>
+      )}
 
       <div className="two-col mt">
         <div className="card">
           <h3>Por medio de pago</h3>
-          <table className="table compact">
+          <table className="table compact big-text">
             <thead><tr><th>Medio</th><th className="r">Cant.</th><th className="r">Total</th><th className="r">Pend. verificar</th></tr></thead>
             <tbody>
               {sum.byMethod.map((m) => (
@@ -134,24 +146,30 @@ export function SummaryView({ sum }) {
           {sum.movements.length > 0 && (
             <>
               <h3 className="mt">Movimientos de efectivo</h3>
-              <table className="table compact">
+              <div className="scroll-box short">
+              <table className="table compact big-text">
                 <tbody>
                   {sum.movements.map((m) => (
                     <tr key={m.id}><td>{fmtDateTime(m.created_at)}</td><td>{m.reason}</td><td className={'r ' + (m.type === 'egreso' ? 'bad-text' : 'ok-text')}>{m.type === 'egreso' ? '−' : '+'}{money(m.amount)}</td></tr>
                   ))}
                 </tbody>
               </table>
+              </div>
             </>
           )}
         </div>
         <div className="card">
-          <h3>Productos vendidos</h3>
-          <table className="table compact">
-            <tbody>
-              {sum.topProducts.map((p) => <tr key={p.name}><td>{p.name}</td><td className="r">{p.qty}</td><td className="r">{money(p.total)}</td></tr>)}
-              {!sum.topProducts.length && <tr><td className="muted">—</td></tr>}
-            </tbody>
-          </table>
+          <h3>Productos vendidos <span className="muted small">({sum.topProducts.length})</span></h3>
+          {/* alto fijo: si hay muchos productos se scrollea adentro y la página no crece */}
+          <div className="scroll-box">
+            <table className="table compact big-text sticky-head">
+              <thead><tr><th>Producto</th><th className="r">Cant.</th><th className="r">Total</th></tr></thead>
+              <tbody>
+                {sum.topProducts.map((p) => <tr key={p.name}><td>{p.name}</td><td className="r b">{p.qty}</td><td className="r">{money(p.total)}</td></tr>)}
+                {!sum.topProducts.length && <tr><td colSpan="3" className="muted">Sin ventas todavía</td></tr>}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </>

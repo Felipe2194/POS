@@ -4,8 +4,7 @@ import { Modal } from '../components.jsx';
 
 export default function Venta() {
   const { session, settings, toast, refresh, go } = useApp();
-  const orderTypes = (settings.order_types || []).filter((t) => t.active !== false);
-  const defaultType = orderTypes.find((t) => t.id === settings.default_order_type)?.id || orderTypes[0]?.id || 'mostrador';
+  const lowStock = Math.max(0, parseInt(settings.low_stock ?? '5') || 0);
   const payMethods = settings.payment_methods.filter((m) => m.active !== false);
   const askCustomer = settings.ask_customer || 'optional';
   const customerRef = useRef();
@@ -14,7 +13,6 @@ export default function Venta() {
   const [cat, setCat] = useState('all');
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState([]);
-  const [orderType, setOrderType] = useState(defaultType);
   const [customer, setCustomer] = useState('');
   const [notes, setNotes] = useState('');
   const [discount, setDiscount] = useState('');
@@ -24,9 +22,13 @@ export default function Venta() {
   const [lastSale, setLastSale] = useState(null);
   const searchRef = useRef();
 
-  useEffect(() => {
-    Promise.all([api.db('listProducts'), api.db('listCategories')]).then(([p, c]) => { setProducts(p); setCategories(c); });
-  }, []);
+  const loadCatalog = () => Promise.all([api.db('listProducts'), api.db('listCategories')]).then(([p, c]) => { setProducts(p); setCategories(c); });
+  useEffect(() => { loadCatalog(); }, []);
+
+  // Unidades disponibles descontando lo que ya está en el pedido (null = sin control)
+  const inCart = (pid) => cart.reduce((a, i) => a + (i.product_id === pid ? i.qty : 0), 0);
+  const left = (p) => (p.stock == null ? null : p.stock - inCart(p.id));
+  const byId = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])), [products]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -47,14 +49,21 @@ export default function Venta() {
   const total = Math.max(0, subtotal - disc);
 
   const add = (p) => {
+    const l = left(p);
+    if (l != null && l <= 0) return toast(p.stock <= 0 ? `No queda más ${p.name}` : `Sólo quedan ${p.stock} de ${p.name}`, 'error');
     setCart((c) => {
       const idx = c.findIndex((i) => i.product_id === p.id && !i.notes && i.price === p.price);
       if (idx >= 0) return c.map((i, k) => (k === idx ? { ...i, qty: i.qty + 1 } : i));
       return [...c, { key: Math.random(), product_id: p.id, name: p.name, price: p.price, qty: 1, notes: '' }];
     });
   };
-  const setQty = (key, qty) => setCart((c) => (qty <= 0 ? c.filter((i) => i.key !== key) : c.map((i) => (i.key === key ? { ...i, qty } : i))));
-  const clear = () => { setCart([]); setCustomer(''); setNotes(''); setDiscount(''); setOrderType(defaultType); };
+  const setQty = (key, qty) => {
+    const it = cart.find((i) => i.key === key);
+    const p = it && byId[it.product_id];
+    if (p && p.stock != null && qty > it.qty && left(p) <= 0) return toast(`Sólo quedan ${p.stock} de ${p.name}`, 'error');
+    setCart((c) => (qty <= 0 ? c.filter((i) => i.key !== key) : c.map((i) => (i.key === key ? { ...i, qty } : i))));
+  };
+  const clear = () => { setCart([]); setCustomer(''); setNotes(''); setDiscount(''); };
 
   const [saving, setSaving] = useState(false);
 
@@ -64,6 +73,16 @@ export default function Venta() {
     clear();
     refresh();
     toast(`✓ Pedido #${sale.number} — ${money(sale.total)}`);
+    // Actualiza cantidades y avisa lo que se terminó o está por terminarse
+    api.db('listProducts').then((list) => {
+      setProducts(list);
+      const sold = new Set(sale.items.map((i) => i.product_id));
+      for (const p of list) {
+        if (!sold.has(p.id) || p.stock == null) continue;
+        if (p.stock <= 0) toast(`⚠ Se terminó: ${p.name}`, 'error');
+        else if (p.stock <= lowStock) toast(`Quedan pocos: ${p.name} (${p.stock})`, 'warn');
+      }
+    });
     // La impresión va a una cola en segundo plano: no se espera, se sigue vendiendo.
     if (settings.auto_print === '1' && settings.printer_name) {
       api.printSale(sale.id).then((r) => { if (!r.ok) toast(`Pedido #${sale.number}: no se imprimió (${r.error})`, 'error'); });
@@ -81,11 +100,11 @@ export default function Venta() {
     setSaving(true);
     try {
       const sale = await api.db('createSale', {
-        items: cart, discount: disc, payments, customer, notes, order_type: orderType,
+        items: cart, discount: disc, payments, customer, notes, order_type: 'mostrador',
         cash_received: cash?.received, change_given: cash?.change,
       });
       onSaved(sale);
-    } catch (e) { toast(cleanErr(e), 'error'); }
+    } catch (e) { toast(cleanErr(e), 'error'); loadCatalog(); }
     setSaving(false);
   };
 
@@ -129,29 +148,29 @@ export default function Venta() {
           ))}
         </div>
         <div className="grid">
-          {visible.map((p) => (
-            <button key={p.id} className="prod" style={{ '--c': p.category_color || '#64748b' }} onClick={() => add(p)}>
-              <span className="prod-name">{p.name}</span>
-              <span className="prod-price">{money(p.price)}</span>
-            </button>
-          ))}
+          {visible.map((p) => {
+            const l = left(p);
+            const out = p.stock != null && p.stock <= 0;
+            return (
+              <button key={p.id} className={'prod ' + (out ? 'out' : l != null && l <= lowStock ? 'low' : '')} style={{ '--c': p.category_color || '#64748b' }} onClick={() => add(p)}>
+                <span className="prod-name">{p.name}</span>
+                <span className="prod-foot">
+                  <span className="prod-price">{money(p.price)}</span>
+                  {out ? <span className="stock-tag out">NO HAY MÁS</span> : l != null && <span className={'stock-tag ' + (l <= lowStock ? 'low' : '')}>Quedan {Math.max(0, l)}</span>}
+                </span>
+              </button>
+            );
+          })}
           {!visible.length && <div className="muted pad">No hay productos. Cargalos en “Productos”.</div>}
         </div>
       </section>
 
       <section className="order">
-        {(orderTypes.length > 1 || askCustomer !== 'hidden') && (
+        {askCustomer !== 'hidden' && (
           <div className="order-head">
-            {orderTypes.length > 1 && (
-              <div className="seg">
-                {orderTypes.map((t) => (
-                  <button key={t.id} className={orderType === t.id ? 'active' : ''} onClick={() => setOrderType(t.id)}>{t.label}</button>
-                ))}
-              </div>
-            )}
-            {askCustomer !== 'hidden' && (
+            {(
               <input ref={customerRef} className={'input ' + (askCustomer === 'required' && cart.length && !customer.trim() ? 'required' : '')}
-                placeholder={(orderType === 'mesa' ? 'N° de mesa' : 'Nombre del cliente') + (askCustomer === 'required' ? ' (obligatorio)' : ' (opcional)')}
+                placeholder={'Nombre del cliente' + (askCustomer === 'required' ? ' (obligatorio)' : ' (opcional)')}
                 value={customer} onChange={(e) => setCustomer(e.target.value)} />
             )}
           </div>

@@ -3,7 +3,6 @@ import { api, useApp } from '../lib.js';
 
 const TABS = [
   { id: 'venta', label: 'Pantalla de venta' },
-  { id: 'pedidos', label: 'Tipos de pedido' },
   { id: 'pagos', label: 'Medios de pago' },
   { id: 'ticketera', label: 'Ticketera' },
   { id: 'negocio', label: 'Negocio' },
@@ -16,7 +15,6 @@ const FONT_SIZES = [
   { value: '1.5', label: 'Muy grande' },
   { value: '1.75', label: 'Enorme' },
 ];
-const BUILTIN_ORDER_TYPES =['mostrador', 'llevar', 'delivery', 'mesa'];
 
 const move = (list, i, d) => {
   const j = i + d;
@@ -69,11 +67,9 @@ export default function Config() {
 
   const save = async () => {
     const methods = s.payment_methods.filter((m) => m.label.trim());
-    const types = s.order_types.filter((t) => t.label.trim());
     if (!methods.some((m) => m.active)) return toast('Tiene que haber al menos un medio de pago activo', 'error');
-    if (!types.some((t) => t.active)) return toast('Tiene que haber al menos un tipo de pedido activo', 'error');
-    const def = types.find((t) => t.id === s.default_order_type && t.active) ? s.default_order_type : types.find((t) => t.active).id;
-    await api.db('saveSettings', { ...s, payment_methods: methods, order_types: types, default_order_type: def });
+    const { order_types, default_order_type, sidebar_collapsed, ...rest } = s; // restos viejos y estado de la barra (se guarda aparte)
+    await api.db('saveSettings', { ...rest, payment_methods: methods, low_stock: String(Math.max(0, parseInt(s.low_stock) || 0)) });
     await refresh();
     toast('Configuración guardada');
   };
@@ -125,6 +121,11 @@ export default function Config() {
               <Toggle checked={flag('show_discount')} onChange={setFlag('show_discount')} label="Descuento" hint="Permite descontar un monto en pesos" />
               <Toggle checked={flag('allow_custom_item')} onChange={setFlag('allow_custom_item')} label="Ítem libre" hint="Vender algo que no está en la lista, con precio a mano" />
             </div>
+            <label className="mt">Avisar “quedan pocos” cuando queden</label>
+            <div className="row gap">
+              <input className="input" type="number" min="0" style={{ width: 120 }} value={s.low_stock ?? '5'} onChange={(e) => set('low_stock', e.target.value)} />
+              <span className="muted">unidades o menos (sólo productos con cantidad cargada)</span>
+            </div>
           </div>
 
           <div className="card">
@@ -143,32 +144,6 @@ export default function Config() {
               <button className="btn ghost">Agregar</button>
             </form>
           </div>
-        </div>
-      )}
-
-      {tab === 'pedidos' && (
-        <div className="card">
-          <h3>Tipos de pedido</h3>
-          <p className="hint">Activá sólo los que usan. Si queda uno solo activo, la pantalla de venta no muestra el selector. El marcado como “por defecto” es el que aparece seleccionado en cada venta nueva.</p>
-          <table className="table cfg">
-            <thead><tr><th>Activo</th><th>Nombre (sale en ticket y comanda)</th><th>Por defecto</th><th>Orden</th><th></th></tr></thead>
-            <tbody>
-              {s.order_types.map((t, i) => (
-                <tr key={t.id} className={t.active ? '' : 'off'}>
-                  <td><span className={'toggle ' + (t.active ? 'on' : '')} onClick={() => updList('order_types', i, { active: !t.active })}><span /></span></td>
-                  <td><input className="input" value={t.label} onChange={(e) => updList('order_types', i, { label: e.target.value })} /></td>
-                  <td><input type="radio" className="radio" name="def" disabled={!t.active} checked={s.default_order_type === t.id} onChange={() => set('default_order_type', t.id)} /></td>
-                  <td className="nowrap">
-                    <button className="btn ghost sm" onClick={() => setList('order_types', (l) => move(l, i, -1))}>▲</button>{' '}
-                    <button className="btn ghost sm" onClick={() => setList('order_types', (l) => move(l, i, 1))}>▼</button>
-                  </td>
-                  <td>{!BUILTIN_ORDER_TYPES.includes(t.id) && <button className="btn danger ghost sm" onClick={() => setList('order_types', (l) => l.filter((_, k) => k !== i))}>Quitar</button>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <button className="btn ghost mt" onClick={() => setList('order_types', (l) => [...l, { id: 't' + Date.now(), label: 'Nuevo tipo', active: true }])}>+ Agregar tipo de pedido</button>
-          <p className="hint">Ejemplos: “PedidosYa”, “Rappi”, “Retira en local”, “Empleados”.</p>
         </div>
       )}
 

@@ -1,6 +1,6 @@
 {
   "name": "pos-comidas",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Sistema POS offline para venta de comidas",
   "main": "electron/main.js",
   "author": "",

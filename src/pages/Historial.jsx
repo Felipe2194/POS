@@ -28,7 +28,6 @@ export default function Historial() {
     const csv = toCsv(rows, [
       { label: 'Fecha', get: (r) => fmtDateTime(r.created_at) },
       { label: 'Pedido', get: (r) => r.number },
-      { label: 'Tipo', get: (r) => settings.order_types.find((t) => t.id === r.order_type)?.label || r.order_type },
       { label: 'Cliente', get: (r) => r.customer },
       { label: 'Detalle', get: (r) => r.detail },
       { label: 'Medios de pago', get: (r) => (r.methods || '').split(',').map((m) => labels[m] || m).join(' + ') },
@@ -52,10 +51,10 @@ export default function Historial() {
   };
 
   return (
-    <div className="page">
+    <div className="page big-page">
       <div className="page-head">
         <h1>Ventas</h1>
-        <button className="btn ghost" onClick={exportCsv}>Exportar a Excel (CSV)</button>
+        <button className="btn ghost lg" onClick={exportCsv}>Exportar a Excel (CSV)</button>
       </div>
       <div className="filters">
         <label className="inline">Desde <input type="date" className="input auto" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
@@ -73,7 +72,7 @@ export default function Historial() {
       </div>
 
       <div className="two-col wide-left mt">
-        <table className="table">
+        <table className="table big">
           <thead><tr><th>Fecha</th><th>#</th><th>Cliente</th><th>Detalle</th><th>Pago</th><th className="r">Total</th><th>Estado</th></tr></thead>
           <tbody>
             {rows.map((r) => (
@@ -92,7 +91,7 @@ export default function Historial() {
         </table>
         <div className="card">
           <h3>Más vendidos</h3>
-          <table className="table compact">
+          <table className="table compact big-text">
             <tbody>
               {report?.byProduct.slice(0, 20).map((p) => <tr key={p.name}><td>{p.name}</td><td className="r">{p.qty}</td><td className="r">{money(p.total)}</td></tr>)}
             </tbody>
@@ -104,12 +103,11 @@ export default function Historial() {
         <Modal title={`Pedido #${detail.number} — ${fmtDateTime(detail.created_at)}`} onClose={() => setDetail(null)}>
           <div className="row gap mb">
             <StatusPill status={detail.status} />
-            <span>{settings.order_types.find((t) => t.id === detail.order_type)?.label || detail.order_type}</span>
             {detail.customer && <b>{detail.customer}</b>}
             <span className="muted">Caja #{detail.session_id}</span>
           </div>
           {detail.status === 'anulada' && <div className="alert bad mb">Anulada {fmtDateTime(detail.voided_at)}: {detail.void_reason}</div>}
-          <table className="table compact">
+          <table className="table compact big-text">
             <tbody>
               {detail.items.map((i) => (
                 <tr key={i.id}><td>{i.qty} x {i.name}{i.notes && <div className="muted small">→ {i.notes}</div>}</td><td className="r">{money(i.price * i.qty)}</td></tr>

@@ -29,14 +29,7 @@ const DEFAULT_SETTINGS = {
     { id: 'debito', label: 'Débito', verify: true, active: true },
     { id: 'credito', label: 'Crédito', verify: true, active: true },
   ]),
-  // Pantalla de venta
-  order_types: JSON.stringify([
-    { id: 'mostrador', label: 'Mostrador', active: true },
-    { id: 'llevar', label: 'Para llevar', active: true },
-    { id: 'delivery', label: 'Delivery', active: true },
-    { id: 'mesa', label: 'Mesa', active: true },
-  ]),
-  default_order_type: 'mostrador',
+  // Pantalla de venta (festival: todo se retira en el mostrador, no hay tipo de pedido)
   ask_customer: 'optional', // hidden | optional | required
   show_notes: '1',
   show_discount: '1',
@@ -44,8 +37,10 @@ const DEFAULT_SETTINGS = {
   quick_notes: JSON.stringify(['Sin sal', 'Sin cebolla', 'Sin mayonesa', 'Bien cocido', 'Para llevar', 'Extra queso']),
   tile_size: 'grande', // normal | grande | extra
   ui_zoom: '1',
+  low_stock: '5', // avisar cuando queden esta cantidad o menos
+  sidebar_collapsed: '0',
 };
-const JSON_KEYS = ['payment_methods', 'order_types', 'quick_notes'];
+const JSON_KEYS = ['payment_methods', 'quick_notes'];
 
 function init(userDataDir) {
   const dataDir = path.join(userDataDir, 'data');
@@ -149,6 +144,11 @@ function init(userDataDir) {
   const ins = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
   for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) ins.run(k, v);
 
+  // Migración: cantidad disponible por producto (NULL = sin control de cantidad)
+  const cols = db.prepare('PRAGMA table_info(products)').all().map((c) => c.name);
+  if (!cols.includes('stock')) db.exec('ALTER TABLE products ADD COLUMN stock REAL');
+  if (!cols.includes('stock_loaded')) db.exec('ALTER TABLE products ADD COLUMN stock_loaded REAL');
+
   // Datos de ejemplo la primera vez
   const count = db.prepare('SELECT COUNT(*) c FROM categories').get().c;
   if (count === 0) seed();
@@ -232,16 +232,33 @@ function listProducts({ includeInactive = false } = {}) {
     ${includeInactive ? 'WHERE p.active >= 0' : 'WHERE p.active = 1'}
     ORDER BY c.sort, p.sort, p.name`).all();
 }
+const cleanStock = (v) => (v === null || v === undefined || v === '' ? null : Math.max(0, Math.round(Number(v) || 0)));
 function saveProduct(p) {
   const price = round2(p.price);
   if (!p.name || !(price >= 0)) throw new Error('Nombre y precio son obligatorios');
+  const stock = cleanStock(p.stock);
   if (p.id) {
-    db.prepare('UPDATE products SET name=?, price=?, category_id=?, active=?, sort=? WHERE id=?')
-      .run(p.name, price, p.category_id || null, p.active ? 1 : 0, p.sort || 0, p.id);
+    const prev = db.prepare('SELECT stock, stock_loaded FROM products WHERE id = ?').get(p.id) || {};
+    // "cargado" acompaña los cambios manuales para poder mostrar "quedan X de Y"
+    let loaded = null;
+    if (stock != null) loaded = prev.stock == null ? stock : Math.max(stock, (prev.stock_loaded ?? prev.stock) + (stock - prev.stock));
+    db.prepare('UPDATE products SET name=?, price=?, category_id=?, active=?, sort=?, stock=?, stock_loaded=? WHERE id=?')
+      .run(p.name, price, p.category_id || null, p.active ? 1 : 0, p.sort || 0, stock, loaded, p.id);
     return p.id;
   }
-  return db.prepare('INSERT INTO products (name, price, category_id, active, sort) VALUES (?, ?, ?, 1, ?)')
-    .run(p.name, price, p.category_id || null, p.sort || 0).lastInsertRowid;
+  return db.prepare('INSERT INTO products (name, price, category_id, active, sort, stock, stock_loaded) VALUES (?, ?, ?, 1, ?, ?, ?)')
+    .run(p.name, price, p.category_id || null, p.sort || 0, stock, stock).lastInsertRowid;
+}
+// Suma unidades a un producto (llegó más mercadería). Si no tenía control de cantidad, lo activa.
+function addStock({ id, qty }) {
+  const n = Math.round(Number(qty) || 0);
+  if (!n) throw new Error('Cantidad inválida');
+  const p = db.prepare('SELECT stock, stock_loaded FROM products WHERE id = ?').get(id);
+  if (!p) throw new Error('Producto inexistente');
+  const stock = Math.max(0, (p.stock || 0) + n);
+  const loaded = Math.max(stock, (p.stock_loaded ?? p.stock ?? 0) + n);
+  db.prepare('UPDATE products SET stock = ?, stock_loaded = ? WHERE id = ?').run(stock, loaded, id);
+  return { stock, stock_loaded: loaded };
 }
 function deleteProduct(id) {
   // borrado lógico para no romper el historial
@@ -357,6 +374,17 @@ function createSale(input) {
     ).lastInsertRowid;
     const insItem = db.prepare('INSERT INTO sale_items (sale_id, product_id, name, price, qty, notes) VALUES (?, ?, ?, ?, ?, ?)');
     for (const i of items) insItem.run(saleId, i.product_id || null, i.name, round2(i.price), i.qty, i.notes || '');
+    // Control de cantidad dentro de la transacción: nunca se vende de más
+    const need = {};
+    for (const i of items) if (i.product_id) need[i.product_id] = (need[i.product_id] || 0) + i.qty;
+    const getP = db.prepare('SELECT name, stock FROM products WHERE id = ?');
+    const decr = db.prepare('UPDATE products SET stock = stock - ? WHERE id = ? AND stock IS NOT NULL');
+    for (const [pid, qty] of Object.entries(need)) {
+      const p = getP.get(pid);
+      if (!p || p.stock == null) continue;
+      if (p.stock < qty) throw new Error(p.stock <= 0 ? `No queda más ${p.name}` : `Sólo quedan ${p.stock} de ${p.name}`);
+      decr.run(qty, pid);
+    }
     const insPay = db.prepare('INSERT INTO sale_payments (sale_id, method, amount, reference, verify_status) VALUES (?, ?, ?, ?, ?)');
     for (const p of payments) insPay.run(saleId, p.method, p.amount, p.reference || '', verifyMap[p.method] ? 'pendiente' : 'no_aplica');
     return saleId;
@@ -392,7 +420,12 @@ function voidSale({ id, reason, pin }) {
   if (sale.status === 'anulada') throw new Error('La venta ya está anulada');
   const sess = getSession(sale.session_id);
   if (sess.status !== 'abierta') throw new Error('No se puede anular una venta de una caja ya cerrada');
-  db.prepare("UPDATE sales SET status='anulada', void_reason=?, voided_at=? WHERE id=?").run(reason || '', now(), id);
+  db.transaction(() => {
+    db.prepare("UPDATE sales SET status='anulada', void_reason=?, voided_at=? WHERE id=?").run(reason || '', now(), id);
+    // las unidades vuelven a estar disponibles
+    const back = db.prepare('UPDATE products SET stock = stock + ? WHERE id = ? AND stock IS NOT NULL');
+    for (const i of sale.items) if (i.product_id) back.run(i.qty, i.product_id);
+  })();
   return getSale(id);
 }
 
@@ -452,7 +485,7 @@ module.exports = {
   api: {
     getSettings, saveSettings, checkPin,
     listCategories, saveCategory, deleteCategory,
-    listProducts, saveProduct, deleteProduct,
+    listProducts, saveProduct, deleteProduct, addStock,
     currentSession, openSession, addMovement, sessionSummary, closeSession, listSessions, getSession,
     createSale, getSale, listSales, voidSale,
     listPayments, setPaymentStatus,

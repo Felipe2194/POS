@@ -23,13 +23,6 @@ export const parseNum = (v) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-export const ORDER_TYPES = [
-  { id: 'mostrador', label: 'Mostrador' },
-  { id: 'llevar', label: 'Para llevar' },
-  { id: 'delivery', label: 'Delivery' },
-  { id: 'mesa', label: 'Mesa' },
-];
-
 export const VERIFY_LABELS = { pendiente: 'Pendiente', verificado: 'Verificado', rechazado: 'Rechazado', no_aplica: '—' };
 
 export function toCsv(rows, columns) {
