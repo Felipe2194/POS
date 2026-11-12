@@ -26,7 +26,22 @@ export default function App() {
   const [toasts, setToasts] = useState([]);
   const [pinAsk, setPinAsk] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [update, setUpdate] = useState(null);
+  const [askUpdate, setAskUpdate] = useState(false);
   const unlocked = useRef(false);
+
+  // Actualizaciones: se descargan solas, pero se instalan solo si el usuario acepta.
+  // Se pregunta una vez por arranque; si dice "más tarde" queda el aviso en el menú.
+  const asked = useRef(false);
+  useEffect(() => {
+    if (!api.update) return;
+    const onState = (st) => {
+      setUpdate(st);
+      if (st.status === 'ready' && !asked.current) { asked.current = true; setAskUpdate(true); }
+    };
+    api.update.get().then(onState);
+    return api.update.onState(onState);
+  }, []);
 
   const toast = useCallback((msg, type = 'ok') => {
     const id = Math.random();
@@ -133,6 +148,12 @@ export default function App() {
               )}
             </span>
           </div>
+          {update?.status === 'ready' && (
+            <button className="update-ready" onClick={() => setAskUpdate(true)} title={'Actualizar a la versión ' + update.version}>
+              <span className="ico">⬆</span>
+              <span className="lbl">Actualización lista<small>versión {update.version}</small></span>
+            </button>
+          )}
           <div className="offline">● Modo local (sin internet)</div>
         </aside>
         <main className="content">
@@ -144,6 +165,10 @@ export default function App() {
         {toasts.map((t) => <div key={t.id} className={'toast ' + t.type}>{t.msg}</div>)}
       </div>
 
+      {askUpdate && update?.status === 'ready' && (
+        <UpdateModal version={update.version} current={update.current} onClose={() => setAskUpdate(false)} />
+      )}
+
       {pinAsk && (
         <PinModal
           reason={pinAsk.reason}
@@ -151,6 +176,26 @@ export default function App() {
         />
       )}
     </AppCtx.Provider>
+  );
+}
+
+function UpdateModal({ version, current, onClose }) {
+  const [installing, setInstalling] = useState(false);
+  return (
+    <Modal title="Hay una nueva versión" onClose={installing ? undefined : onClose} small>
+      <p>Está lista para instalar la versión <b>{version}</b>{current ? <> (tenés la {current})</> : null}.</p>
+      <p className="muted">
+        El programa se cierra y se vuelve a abrir solo en menos de un minuto. Las ventas, los productos
+        y la caja abierta <b>no se pierden</b>, y antes se guarda una copia de seguridad.
+      </p>
+      <p className="muted">Si están atendiendo, elegí <b>Más tarde</b>: el aviso queda en el menú para cuando terminen.</p>
+      <div className="row end mt">
+        <button className="btn ghost lg" disabled={installing} onClick={onClose}>Más tarde</button>
+        <button className="btn primary lg" disabled={installing} onClick={async () => { setInstalling(true); if (!(await api.update.install())) setInstalling(false); }}>
+          {installing ? 'Actualizando…' : 'Actualizar ahora'}
+        </button>
+      </div>
+    </Modal>
   );
 }
 

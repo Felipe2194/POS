@@ -345,3 +345,11 @@ input[type="date"].input { padding: 11px 12px; }
 .two-col > *, .hero-stats > * { min-width: 0; }
 @media (max-width: 1440px) { .hero-value { font-size: min(52px, 12.5cqi); } }
 @media (max-height: 860px) { .order-foot .total { font-size: min(28px, 8cqi); } }
+
+/* Aviso de actualización lista (menú lateral) */
+.update-ready { display: flex; align-items: center; gap: 10px; padding: 12px; border: 0; border-radius: 10px; background: #1d4ed8; color: #fff; font-weight: 700; font-size: 15px; text-align: left; cursor: pointer; }
+.update-ready:hover { background: #2563eb; }
+.update-ready .ico { font-size: 20px; width: 28px; text-align: center; }
+.update-ready small { display: block; font-weight: 400; opacity: .8; font-size: 13px; margin-top: 2px; }
+.app.collapsed .update-ready { justify-content: center; padding: 14px 0; }
+.app.collapsed .update-ready .lbl { display: none; }

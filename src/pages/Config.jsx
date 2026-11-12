@@ -252,8 +252,47 @@ export default function Config() {
               <button className="btn ghost" onClick={() => api.backupOpenFolder()}>Abrir copias automáticas</button>
             </div>
           </div>
+          <UpdatesCard />
         </div>
       )}
+    </div>
+  );
+}
+
+const UPDATE_TEXT = {
+  idle: 'Todavía no se buscaron actualizaciones.',
+  dev: 'Modo desarrollo: las actualizaciones solo funcionan en la versión instalada.',
+  checking: 'Buscando…',
+  none: 'Tenés la última versión.',
+  downloading: 'Descargando la nueva versión…',
+  ready: 'Hay una nueva versión lista para instalar (aviso en el menú).',
+  error: 'No se pudo buscar (¿hay internet?). Se vuelve a intentar sola más tarde.',
+};
+
+function UpdatesCard() {
+  const [st, setSt] = useState(null);
+  useEffect(() => {
+    if (!api.update) return;
+    api.update.get().then(setSt);
+    return api.update.onState((x) => setSt((prev) => ({ ...prev, ...x })));
+  }, []);
+  if (!st) return null;
+  return (
+    <div className="card">
+      <h3>Actualizaciones</h3>
+      <p>Versión instalada: <b>{st.current}</b></p>
+      <p className="hint">
+        Con internet, el programa busca versiones nuevas solo y las descarga sin interrumpir.
+        Antes de instalar siempre pregunta.
+      </p>
+      <p className="hint">
+        {UPDATE_TEXT[st.status] || ''}
+        {st.status === 'downloading' && st.percent ? ` ${st.percent}%` : ''}
+        {st.status === 'ready' && st.version ? ` (versión ${st.version})` : ''}
+      </p>
+      <button className="btn ghost" disabled={st.status === 'checking' || st.status === 'downloading'} onClick={() => api.update.check()}>
+        Buscar actualizaciones
+      </button>
     </div>
   );
 }

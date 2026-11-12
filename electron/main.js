@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('./db');
 const printer = require('./print');
+const updater = require('./updater');
 
 const isDev = !!process.env.VITE_DEV;
 let win;
@@ -131,6 +132,18 @@ app.whenReady().then(async () => {
   });
 
   createWindow();
+
+  // Antes de instalar una actualización se guarda una copia de la base, por las dudas.
+  // (el nombre empieza con pos-fecha para que la limpieza de "últimas 30" la ordene por fecha)
+  updater.setup({
+    win: () => win,
+    onBeforeInstall: async () => {
+      const dir = path.join(userData, 'backups');
+      fs.mkdirSync(dir, { recursive: true });
+      const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+      await db.backupTo(path.join(dir, `pos-${stamp}-antes-de-actualizar-v${app.getVersion()}.sqlite`));
+    },
+  });
 });
 
 app.on('window-all-closed', () => app.quit());

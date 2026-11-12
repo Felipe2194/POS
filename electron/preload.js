@@ -12,4 +12,14 @@ contextBridge.exposeInMainWorld('pos', {
   backupSave: () => ipcRenderer.invoke('backup:save'),
   backupOpenFolder: () => ipcRenderer.invoke('backup:openFolder'),
   exportCsv: (filename, csv) => ipcRenderer.invoke('export:csv', filename, csv),
+  update: {
+    get: () => ipcRenderer.invoke('update:get'),
+    check: () => ipcRenderer.invoke('update:check'),
+    install: () => ipcRenderer.invoke('update:install'),
+    onState: (cb) => {
+      const fn = (_e, st) => cb(st);
+      ipcRenderer.on('update:state', fn);
+      return () => ipcRenderer.removeListener('update:state', fn);
+    },
+  },
 });

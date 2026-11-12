@@ -23,6 +23,21 @@ npm run dist     # genera el instalador .exe en /release
 
 Requiere Node 22+. `better-sqlite3` usa un binario precompilado para Electron (no hace falta Visual Studio).
 
+## Publicar una versión (actualización automática)
+
+Los instaladores se publican en el repo **público** `Felipe2194/pos-comidas-releases` (solo el `.exe` y `latest.yml`; este repo de código sigue privado).
+
+1. Subir `"version"` en `package.json` (ej. `1.3.0` → `1.3.1`) y commitear.
+2. `npm run release` (usa la sesión de `gh`; arma el instalador, lo sube como Release y crea el tag).
+3. `git push && git push --tags`.
+
+Las PCs de los clientes, cuando tienen internet, buscan versiones al arrancar y cada 4 horas, la descargan en segundo plano
+y **preguntan** antes de instalar ("Actualizar ahora" / "Más tarde"). Si eligen más tarde, queda un aviso en el menú.
+Antes de instalar se guarda una copia `pos-<fecha>-antes-de-actualizar-v<versión>.sqlite` en la carpeta de backups.
+Los datos (`%APPDATA%`) no se tocan al actualizar.
+
+> Las PCs con versiones anteriores a la 1.3.0 no tienen el actualizador: hay que instalarles la 1.3.0 a mano una sola vez.
+
 ## Datos
 
 - Base de datos: `%APPDATA%\pos-comidas\data\pos.sqlite`
