@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const db = require('./db');
@@ -12,22 +12,35 @@ if (!app.requestSingleInstanceLock()) app.quit();
 app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
 
 function createWindow() {
+  // Se crea oculta y ya del tamaño de la pantalla: así no se ve una ventana recortada
+  // que después se agranda. Se muestra cuando la app avisa que terminó de dibujarse.
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   win = new BrowserWindow({
-    width: 1366,
-    height: 820,
+    width,
+    height,
+    show: false,
     minWidth: 1024,
     minHeight: 640,
     title: 'POS Comidas',
     icon: path.join(__dirname, 'icon.png'),
     autoHideMenuBar: true,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#f1f5f9',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
-  win.maximize();
+  let shown = false;
+  const reveal = () => {
+    if (shown || win.isDestroyed()) return;
+    shown = true;
+    win.maximize();
+    win.show();
+    win.focus();
+  };
+  ipcMain.once('app:ready', reveal);
+  setTimeout(reveal, 6000); // por las dudas, nunca queda invisible
   if (isDev) win.loadURL('http://localhost:5173');
   else win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
 }

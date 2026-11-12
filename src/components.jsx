@@ -30,7 +30,7 @@ export function Stat({ label, value, tone, sub }) {
 }
 
 export function StatusPill({ status }) {
-  const map = { pendiente: 'warn', verificado: 'ok', rechazado: 'bad', ok: 'ok', anulada: 'bad', abierta: 'ok', cerrada: 'muted' };
-  const label = { pendiente: 'Pendiente', verificado: 'Verificado', rechazado: 'Rechazado', ok: 'OK', anulada: 'Anulada', abierta: 'Abierta', cerrada: 'Cerrada', no_aplica: '—' };
+  const map = { pendiente: 'warn', verificado: 'ok', rechazado: 'bad', ok: 'ok', anulada: 'bad', rechazada: 'bad', abierta: 'ok', cerrada: 'muted' };
+  const label = { pendiente: 'Pendiente', verificado: 'Verificado', rechazado: 'No llegó', ok: 'Cobrada', anulada: 'Anulada', rechazada: 'Pago no recibido', abierta: 'Abierta', cerrada: 'Cerrada', no_aplica: '—' };
   return <span className={'pill ' + (map[status] || 'muted')}>{label[status] || status}</span>;
 }

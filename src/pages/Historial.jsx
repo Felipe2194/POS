@@ -60,7 +60,7 @@ export default function Historial() {
         <label className="inline">Desde <input type="date" className="input auto" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
         <label className="inline">Hasta <input type="date" className="input auto" value={to} onChange={(e) => setTo(e.target.value)} /></label>
         <select className="input auto" value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">Todas</option><option value="ok">Válidas</option><option value="anulada">Anuladas</option>
+          <option value="">Todas</option><option value="ok">Cobradas</option><option value="anulada">Anuladas</option><option value="rechazada">Pago no recibido</option>
         </select>
         <input className="input auto" placeholder="Buscar cliente o N° pedido" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
@@ -72,11 +72,12 @@ export default function Historial() {
       </div>
 
       <div className="two-col wide-left mt">
+        <div className="table-wrap">
         <table className="table big">
           <thead><tr><th>Fecha</th><th>#</th><th>Cliente</th><th>Detalle</th><th>Pago</th><th className="r">Total</th><th>Estado</th></tr></thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.id} className={'clickable ' + (r.status === 'anulada' ? 'voided' : '')} onClick={async () => setDetail(await api.db('getSale', r.id))}>
+              <tr key={r.id} className={'clickable ' + (r.status !== 'ok' ? 'voided' : '')} onClick={async () => setDetail(await api.db('getSale', r.id))}>
                 <td className="nowrap">{fmtDateTime(r.created_at)}</td>
                 <td>{r.number}</td>
                 <td>{r.customer}</td>
@@ -89,6 +90,7 @@ export default function Historial() {
             {!rows.length && <tr><td colSpan="7" className="muted center pad">Sin ventas en el período</td></tr>}
           </tbody>
         </table>
+        </div>
         <div className="card">
           <h3>Más vendidos</h3>
           <table className="table compact big-text">
@@ -107,6 +109,7 @@ export default function Historial() {
             <span className="muted">Caja #{detail.session_id}</span>
           </div>
           {detail.status === 'anulada' && <div className="alert bad mb">Anulada {fmtDateTime(detail.voided_at)}: {detail.void_reason}</div>}
+          {detail.status === 'rechazada' && <div className="alert bad mb">Cancelada {fmtDateTime(detail.voided_at)} — {detail.void_reason}. No suma en ventas ni en caja. Si el pago aparece, marcalo como “Llegó” en Verificar pagos.</div>}
           <table className="table compact big-text">
             <tbody>
               {detail.items.map((i) => (
@@ -129,7 +132,7 @@ export default function Historial() {
           <div className="row between mt">
             {detail.status === 'ok' ? <button className="btn danger ghost" onClick={() => setVoiding({ sale: detail, reason: '' })}>Anular venta</button> : <span />}
             <div className="row gap">
-              <button className="btn ghost" onClick={() => api.printSale(detail.id, { ticket: false, comanda: true, preview: !settings.printer_name })}>Reimprimir comanda</button>
+              {settings.print_comanda === '1' && <button className="btn ghost" onClick={() => api.printSale(detail.id, { ticket: false, comanda: true, preview: !settings.printer_name })}>Reimprimir comanda</button>}
               <button className="btn primary" onClick={() => api.printSale(detail.id, { ticket: true, comanda: false, preview: !settings.printer_name })}>Reimprimir ticket</button>
             </div>
           </div>

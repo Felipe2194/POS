@@ -55,6 +55,7 @@ function ticketHtml(sale, settings) {
     ${sale.customer ? `<div class="c big">${esc(sale.customer)}</div>` : ''}
     <div class="c">${fmtDate(sale.created_at)}</div>
     ${sale.status === 'anulada' ? '<div class="c big inv">ANULADA</div>' : ''}
+    ${sale.status === 'rechazada' ? '<div class="c big inv">CANCELADA - PAGO NO RECIBIDO</div>' : ''}
     <hr>
     <table>${rows}</table>
     <hr>
@@ -110,6 +111,7 @@ function closeHtml(sum, settings) {
       <tr><td>Ventas (${sum.totals.n})</td><td class="r b">${money(sum.totals.total)}</td></tr>
       ${sum.totals.discount > 0 ? `<tr><td>Descuentos</td><td class="r">${money(sum.totals.discount)}</td></tr>` : ''}
       ${sum.voided.n > 0 ? `<tr><td>Anuladas (${sum.voided.n})</td><td class="r">${money(sum.voided.total)}</td></tr>` : ''}
+      ${sum.rejected && sum.rejected.n > 0 ? `<tr><td>Pago no recibido (${sum.rejected.n})</td><td class="r">${money(sum.rejected.total)}</td></tr>` : ''}
     </table>
     <hr><div class="b">POR MEDIO DE PAGO</div>
     <table>${methods || '<tr><td>Sin ventas</td></tr>'}</table>

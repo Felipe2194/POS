@@ -192,16 +192,20 @@ export default function Config() {
           <div className="card">
             <h3>Qué se imprime</h3>
             <Toggle checked={s.auto_print === '1'} onChange={setFlag('auto_print')} label="Imprimir automáticamente al cobrar" hint="Sale solo, sin frenar la venta" />
-            <Toggle checked={s.print_ticket === '1'} onChange={setFlag('print_ticket')} label="Ticket para el cliente" hint="Con precios y medio de pago" />
-            <Toggle checked={s.print_comanda === '1'} onChange={setFlag('print_comanda')} label="Comanda para cocina" hint="Letra grande, sin precios, con notas" />
-            <label className="mt">Copias de comanda</label>
-            <Choice value={String(s.comanda_copies || '1')} onChange={(v) => set('comanda_copies', v)} options={['1', '2', '3'].map((n) => ({ value: n, label: n }))} />
+            <Toggle checked={s.print_ticket === '1'} onChange={setFlag('print_ticket')} label="Ticket para el cliente" hint="El cliente lo entrega en la cocina para retirar su pedido" />
+            <Toggle checked={s.print_comanda === '1'} onChange={setFlag('print_comanda')} label="Comanda aparte para cocina (opcional)" hint="No hace falta si el cliente entrega el ticket. Usala sólo si la cocina necesita su propia copia para ir preparando (sale además del ticket)." />
+            {s.print_comanda === '1' && (
+              <>
+                <label className="mt">Copias de comanda</label>
+                <Choice value={String(s.comanda_copies || '1')} onChange={(v) => set('comanda_copies', v)} options={['1', '2', '3'].map((n) => ({ value: n, label: n }))} />
+              </>
+            )}
           </div>
 
           {[
             { kind: 'ticket', title: 'Letra del ticket del cliente', scaleKey: 'ticket_font_scale', boldKey: 'ticket_bold' },
             { kind: 'comanda', title: 'Letra de la comanda de cocina', scaleKey: 'comanda_font_scale', boldKey: 'comanda_bold' },
-          ].map((f) => (
+          ].filter((f) => f.kind === 'ticket' || s.print_comanda === '1').map((f) => (
             <div className="card" key={f.kind}>
               <h3>{f.title}</h3>
               <label>Tamaño</label>

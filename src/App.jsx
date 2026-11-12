@@ -47,6 +47,13 @@ export default function App() {
 
   useEffect(() => { refresh(); }, [refresh]);
   useEffect(() => { if (settings) api.setZoom(settings.ui_zoom); }, [settings?.ui_zoom]);
+  // Primera vez que todo está dibujado (con zoom aplicado): recién ahí se muestra la ventana
+  const announced = useRef(false);
+  useEffect(() => {
+    if (!settings || announced.current) return;
+    announced.current = true;
+    requestAnimationFrame(() => requestAnimationFrame(() => api.ready?.()));
+  }, [settings]);
   // se recuerda si la barra quedó colapsada
   useEffect(() => { if (settings) setCollapsed(settings.sidebar_collapsed === '1'); }, [settings?.sidebar_collapsed]);
   const toggleSidebar = () => {

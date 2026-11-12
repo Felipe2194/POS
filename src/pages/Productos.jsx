@@ -65,6 +65,7 @@ export default function Productos() {
       </div>
       <input className="input auto mb" style={{ minWidth: 320 }} placeholder="Filtrar…" value={filter} onChange={(e) => setFilter(e.target.value)} />
 
+      <div className="table-wrap">
       <table className="table big">
         <thead><tr><th>Producto</th><th>Categoría</th><th className="r">Precio</th><th>Cantidad para el evento</th><th>Visible en venta</th><th></th></tr></thead>
         <tbody>
@@ -99,6 +100,7 @@ export default function Productos() {
           ))}
         </tbody>
       </table>
+      </div>
 
       {adding && <AddStockModal product={adding} onClose={() => setAdding(null)} onAdd={(q) => addStock(adding, q)} />}
 

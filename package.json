@@ -1,6 +1,6 @@
 {
   "name": "pos-comidas",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Sistema de ventas offline para festivales y eventos de comida",
   "main": "electron/main.js",
   "author": "POS Comidas",

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, money, fmtDateTime, today, useApp } from '../lib.js';
 import { Modal, Stat, StatusPill } from '../components.jsx';
+import { cleanErr } from './Venta.jsx';
 
 // Control de transferencias / QR / tarjetas: el personal revisa en el homebanking
 // o app de Mercado Pago y marca cada cobro como verificado o rechazado.
@@ -21,8 +22,12 @@ export default function Pagos() {
 
   const set = async (row, st, note) => {
     if (st === 'rechazado' && note === undefined) return setRejecting({ row, note: row.verify_note || '' });
-    await api.db('setPaymentStatus', { id: row.id, status: st, note });
-    toast(st === 'verificado' ? 'Pago verificado ✓' : st === 'rechazado' ? 'Pago marcado como rechazado' : 'Vuelto a pendiente');
+    try {
+      const sale = await api.db('setPaymentStatus', { id: row.id, status: st, note });
+      toast(st === 'rechazado' ? `Pedido #${sale.number} cancelado: ya no suma en ventas ni en caja`
+        : sale.status === 'ok' && row.sale_status === 'rechazada' ? `Pedido #${sale.number} vuelve a contar como cobrado`
+        : st === 'verificado' ? 'Pago verificado ✓' : 'Vuelto a pendiente');
+    } catch (e) { return toast(cleanErr(e), 'error'); }
     load();
     refresh();
   };
@@ -55,6 +60,7 @@ export default function Pagos() {
         {(status === 'rechazado' || status === 'todos') && <Stat label="Rechazado" value={money(sumBy('rechazado'))} tone="bad" />}
       </div>
 
+      <div className="table-wrap">
       <table className="table big pay-table mt">
         <thead><tr><th>Fecha</th><th>Pedido</th><th>Cliente</th><th>Medio</th><th>Referencia</th><th className="r">Monto</th><th>Estado</th><th className="r">Acciones</th></tr></thead>
         <tbody>
@@ -66,7 +72,7 @@ export default function Pagos() {
               <td>{labels[r.method] || r.method}</td>
               <td>{r.reference || <span className="muted">—</span>}{r.verify_note && <div className="muted small">{r.verify_note}</div>}</td>
               <td className="r b">{money(r.amount)}</td>
-              <td><StatusPill status={r.verify_status} />{r.verified_at && <div className="muted small">{fmtDateTime(r.verified_at)}</div>}</td>
+              <td><StatusPill status={r.verify_status} />{r.sale_status === 'rechazada' && <div className="bad-text small">Pedido cancelado</div>}{r.verified_at && <div className="muted small">{fmtDateTime(r.verified_at)}</div>}</td>
               <td className="r nowrap">
                 <div className="pay-actions">
                   {r.verify_status !== 'verificado' && <button className="btn ok xl" onClick={() => set(r, 'verificado')}>✓ Llegó</button>}
@@ -79,6 +85,7 @@ export default function Pagos() {
           {!rows.length && <tr><td colSpan="8" className="muted center pad">No hay pagos {status !== 'todos' ? status + 's' : ''} con esos filtros 🎉</td></tr>}
         </tbody>
       </table>
+      </div>
 
       {rejecting && (
         <Modal title={`Rechazar pago del pedido #${rejecting.row.number}`} onClose={() => setRejecting(null)} small>

@@ -14,7 +14,7 @@ const DEFAULT_SETTINGS = {
   printer_name: '',
   paper_width: '80', // mm: 58 u 80
   print_ticket: '1', // ticket para el cliente
-  print_comanda: '1', // comanda para cocina
+  print_comanda: '0', // comanda aparte para cocina (en festivales el cliente entrega el ticket)
   comanda_copies: '1',
   ticket_font_scale: '1', // tamaño de letra del ticket (0.85 a 1.75)
   comanda_font_scale: '1.25', // la comanda arranca un poco más grande
@@ -148,6 +148,16 @@ function init(userDataDir) {
   const cols = db.prepare('PRAGMA table_info(products)').all().map((c) => c.name);
   if (!cols.includes('stock')) db.exec('ALTER TABLE products ADD COLUMN stock REAL');
   if (!cols.includes('stock_loaded')) db.exec('ALTER TABLE products ADD COLUMN stock_loaded REAL');
+
+  // Migración (una vez): el ticket del cliente es el comprobante para retirar en la cocina,
+  // así que la comanda aparte queda apagada en instalaciones existentes.
+  if (!db.prepare("SELECT 1 FROM settings WHERE key = 'mig_comanda_off'").get()) {
+    db.prepare("UPDATE settings SET value = '0' WHERE key = 'print_comanda'").run();
+    db.prepare("INSERT INTO settings (key, value) VALUES ('mig_comanda_off', '1')").run();
+  }
+  // Ventas con un pago rechazado de versiones anteriores: dejan de contar como vendidas
+  db.prepare(`UPDATE sales SET status = 'rechazada', void_reason = 'Pago no recibido'
+    WHERE status = 'ok' AND id IN (SELECT sale_id FROM sale_payments WHERE verify_status = 'rechazado')`).run();
 
   // Datos de ejemplo la primera vez
   const count = db.prepare('SELECT COUNT(*) c FROM categories').get().c;
@@ -305,6 +315,7 @@ function sessionSummary(sessionId) {
     SELECT COUNT(*) n, COALESCE(SUM(total),0) total, COALESCE(SUM(discount),0) discount
     FROM sales WHERE session_id = ? AND status = 'ok'`).get(sessionId);
   const voided = db.prepare(`SELECT COUNT(*) n, COALESCE(SUM(total),0) total FROM sales WHERE session_id = ? AND status = 'anulada'`).get(sessionId);
+  const rejected = db.prepare(`SELECT COUNT(*) n, COALESCE(SUM(total),0) total FROM sales WHERE session_id = ? AND status = 'rechazada'`).get(sessionId);
   const movements = db.prepare('SELECT * FROM cash_movements WHERE session_id = ? ORDER BY id').all(sessionId);
   const ingresos = movements.filter((m) => m.type === 'ingreso').reduce((a, m) => a + m.amount, 0);
   const egresos = movements.filter((m) => m.type === 'egreso').reduce((a, m) => a + m.amount, 0);
@@ -319,6 +330,7 @@ function sessionSummary(sessionId) {
     session: s,
     totals,
     voided,
+    rejected,
     byMethod,
     movements,
     ingresos: round2(ingresos),
@@ -418,6 +430,7 @@ function voidSale({ id, reason, pin }) {
   const sale = getSale(id);
   if (!sale) throw new Error('Venta inexistente');
   if (sale.status === 'anulada') throw new Error('La venta ya está anulada');
+  if (sale.status === 'rechazada') throw new Error('La venta ya está cancelada por pago no recibido');
   const sess = getSession(sale.session_id);
   if (sess.status !== 'abierta') throw new Error('No se puede anular una venta de una caja ya cerrada');
   db.transaction(() => {
@@ -431,22 +444,41 @@ function voidSale({ id, reason, pin }) {
 
 // ---------- Verificación de pagos ----------
 function listPayments({ status = 'pendiente', method, from, to } = {}) {
-  const where = ["v.status = 'ok'", "p.verify_status != 'no_aplica'"];
+  const where = ["v.status IN ('ok', 'rechazada')", "p.verify_status != 'no_aplica'"];
   const args = [];
   if (status && status !== 'todos') { where.push('p.verify_status = ?'); args.push(status); }
   if (method) { where.push('p.method = ?'); args.push(method); }
   if (from) { where.push('v.day >= ?'); args.push(from); }
   if (to) { where.push('v.day <= ?'); args.push(to); }
   return db.prepare(`
-    SELECT p.*, v.number, v.day, v.created_at, v.customer, v.total sale_total, v.session_id
+    SELECT p.*, v.number, v.day, v.created_at, v.customer, v.total sale_total, v.session_id, v.status sale_status
     FROM sale_payments p JOIN sales v ON v.id = p.sale_id
     WHERE ${where.join(' AND ')}
     ORDER BY v.id DESC LIMIT 1000`).all(...args);
 }
+// Si el pago no llegó, el pedido queda cancelado (status 'rechazada'): no suma en ventas ni en caja
+// y las unidades vuelven a estar disponibles. "Deshacer" lo vuelve a activar.
 function setPaymentStatus({ id, status, note, reference }) {
   if (!['pendiente', 'verificado', 'rechazado'].includes(status)) throw new Error('Estado inválido');
-  db.prepare('UPDATE sale_payments SET verify_status=?, verified_at=?, verify_note=COALESCE(?, verify_note), reference=COALESCE(?, reference) WHERE id=?')
-    .run(status, status === 'pendiente' ? null : now(), note ?? null, reference ?? null, id);
+  const pay = db.prepare('SELECT * FROM sale_payments WHERE id = ?').get(id);
+  if (!pay) throw new Error('Pago inexistente');
+  const sale = getSale(pay.sale_id);
+  if (sale.status === 'anulada') throw new Error('La venta está anulada');
+  db.transaction(() => {
+    db.prepare('UPDATE sale_payments SET verify_status=?, verified_at=?, verify_note=COALESCE(?, verify_note), reference=COALESCE(?, reference) WHERE id=?')
+      .run(status, status === 'pendiente' ? null : now(), note ?? null, reference ?? null, id);
+    const anyRejected = db.prepare("SELECT COUNT(*) c FROM sale_payments WHERE sale_id = ? AND verify_status = 'rechazado'").get(sale.id).c > 0;
+    if (anyRejected && sale.status === 'ok') {
+      db.prepare("UPDATE sales SET status='rechazada', void_reason=?, voided_at=? WHERE id=?").run('Pago no recibido' + (note ? ': ' + note : ''), now(), sale.id);
+      const back = db.prepare('UPDATE products SET stock = stock + ? WHERE id = ? AND stock IS NOT NULL');
+      for (const i of sale.items) if (i.product_id) back.run(i.qty, i.product_id);
+    } else if (!anyRejected && sale.status === 'rechazada') {
+      db.prepare("UPDATE sales SET status='ok', void_reason=NULL, voided_at=NULL WHERE id=?").run(sale.id);
+      const take = db.prepare('UPDATE products SET stock = MAX(0, stock - ?) WHERE id = ? AND stock IS NOT NULL');
+      for (const i of sale.items) if (i.product_id) take.run(i.qty, i.product_id);
+    }
+  })();
+  return getSale(sale.id);
 }
 
 // ---------- Reportes ----------

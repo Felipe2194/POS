@@ -34,6 +34,7 @@ export default function Caja() {
       {!session ? <OpenForm onOpened={() => { refresh(); toast('Caja abierta'); }} /> : summary && <SummaryView sum={summary} />}
 
       <h2 className="mt-l">Historial de cajas</h2>
+      <div className="table-wrap">
       <table className="table big">
         <thead><tr><th>#</th><th>Apertura</th><th>Cierre</th><th>Cajero</th><th className="r">Ventas</th><th className="r">Esperado</th><th className="r">Contado</th><th className="r">Diferencia</th><th>Estado</th><th></th></tr></thead>
         <tbody>
@@ -56,6 +57,7 @@ export default function Caja() {
           ))}
         </tbody>
       </table>
+      </div>
 
       {mov && (
         <MovementModal type={mov} onClose={() => setMov(null)} onSaved={() => { setMov(null); load(); toast('Movimiento registrado'); }} />
@@ -121,10 +123,11 @@ export function SummaryView({ sum }) {
           <div className="hero-sub">{sum.totals.n} ventas{sum.totals.n ? ` · promedio ${money(sum.totals.total / sum.totals.n)}` : ''}</div>
         </div>
       </div>
-      {(s.status === 'cerrada' || sum.voided.n > 0) && (
+      {(s.status === 'cerrada' || sum.voided.n > 0 || sum.rejected?.n > 0) && (
         <div className="stats mt">
           {s.status === 'cerrada' && <Stat label="Diferencia de arqueo" value={money(s.difference)} tone={s.difference < 0 ? 'bad' : s.difference > 0 ? 'ok' : ''} sub={`contado ${money(s.counted_cash)}`} />}
           {sum.voided.n > 0 && <Stat label="Anuladas" value={sum.voided.n} sub={money(sum.voided.total)} tone="bad" />}
+          {sum.rejected?.n > 0 && <Stat label="Pago no recibido (cancelados)" value={sum.rejected.n} sub={`${money(sum.rejected.total)} — no suman`} tone="bad" />}
         </div>
       )}
 
