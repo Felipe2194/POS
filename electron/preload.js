@@ -11,7 +11,7 @@ contextBridge.exposeInMainWorld('pos', {
   printSample: (settings, kind, opts) => ipcRenderer.invoke('print:sample', settings, kind, opts),
   backupSave: () => ipcRenderer.invoke('backup:save'),
   backupOpenFolder: () => ipcRenderer.invoke('backup:openFolder'),
-  exportCsv: (filename, csv) => ipcRenderer.invoke('export:csv', filename, csv),
+  exportSales: (filters) => ipcRenderer.invoke('export:sales', filters),
   update: {
     get: () => ipcRenderer.invoke('update:get'),
     check: () => ipcRenderer.invoke('update:check'),

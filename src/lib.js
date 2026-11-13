@@ -5,8 +5,19 @@ export const api = window.pos;
 export const money = (n) =>
   '$ ' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
-export const fmtDateTime = (iso) => (iso ? new Date(iso).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '');
-export const fmtTime = (iso) => (iso ? new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '');
+// Fechas siempre día/mes/año y hora de 24 hs, armadas a mano para no depender del idioma de Windows.
+const z2 = (n) => String(n).padStart(2, '0');
+export const fmtTime = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${z2(d.getHours())}:${z2(d.getMinutes())}`;
+};
+export const fmtDate = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${z2(d.getDate())}/${z2(d.getMonth() + 1)}/${d.getFullYear()}`;
+};
+export const fmtDateTime = (iso) => (iso ? `${fmtDate(iso)} ${fmtTime(iso)}` : '');
 
 export const today = () => {
   const d = new Date();
@@ -26,15 +37,6 @@ export const parseNum = (v) => {
 };
 
 export const VERIFY_LABELS = { pendiente: 'Pendiente', verificado: 'Verificado', rechazado: 'Rechazado', no_aplica: '—' };
-
-export function toCsv(rows, columns) {
-  const escCell = (v) => {
-    const s = String(v ?? '');
-    return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  // separador ; para Excel en configuración regional es-AR
-  return [columns.map((c) => c.label).join(';'), ...rows.map((r) => columns.map((c) => escCell(c.get(r))).join(';'))].join('\r\n');
-}
 
 export const AppCtx = createContext(null);
 export const useApp = () => useContext(AppCtx);

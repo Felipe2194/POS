@@ -4,9 +4,14 @@ const fs = require('fs');
 const db = require('./db');
 const printer = require('./print');
 const updater = require('./updater');
+const { buildSalesWorkbook } = require('./excel');
 
 const isDev = !!process.env.VITE_DEV;
 let win;
+
+// Idioma de la app fijo en español (Argentina), sin importar el idioma de Windows:
+// así los selectores de fecha muestran día/mes/año y no mes/día/año.
+app.commandLine.appendSwitch('lang', 'es-AR');
 
 // Una sola instancia (evita dos cajas escribiendo a la vez)
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -121,13 +126,29 @@ app.whenReady().then(async () => {
     return dir;
   });
 
-  ipcMain.handle('export:csv', async (_e, filename, csv) => {
+  ipcMain.handle('export:sales', async (_e, filters = {}) => {
+    const { from, to } = filters;
     const { canceled, filePath } = await dialog.showSaveDialog(win, {
-      defaultPath: filename,
-      filters: [{ name: 'CSV (Excel)', extensions: ['csv'] }],
+      title: 'Exportar ventas a Excel',
+      defaultPath: `ventas_${from}_a_${to}.xlsx`,
+      filters: [{ name: 'Excel', extensions: ['xlsx'] }],
     });
     if (canceled || !filePath) return null;
-    fs.writeFileSync(filePath, '﻿' + csv, 'utf8'); // BOM para que Excel respete acentos
+    const settings = db.api.getSettings();
+    const sales = db.api.listSales({ ...filters, limit: 1000000 })
+      .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.id - b.id);
+    const buf = await buildSalesWorkbook({
+      business: settings.business_name,
+      from, to, sales,
+      labels: Object.fromEntries((settings.payment_methods || []).map((m) => [m.id, m.label])),
+      report: db.api.report({ from, to }),
+    });
+    try {
+      fs.writeFileSync(filePath, Buffer.from(buf));
+    } catch (e) {
+      if (e.code === 'EBUSY' || e.code === 'EPERM') throw new Error('El archivo está abierto en Excel. Cerralo y volvé a exportar.');
+      throw e;
+    }
     return filePath;
   });
 

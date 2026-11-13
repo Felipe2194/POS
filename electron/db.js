@@ -410,7 +410,7 @@ function getSale(id) {
   sale.payments = db.prepare('SELECT * FROM sale_payments WHERE sale_id = ? ORDER BY id').all(id);
   return sale;
 }
-function listSales({ from, to, sessionId, status, q } = {}) {
+function listSales({ from, to, sessionId, status, q, limit = 1000 } = {}) {
   const where = [];
   const args = [];
   if (sessionId) { where.push('v.session_id = ?'); args.push(sessionId); }
@@ -422,7 +422,7 @@ function listSales({ from, to, sessionId, status, q } = {}) {
     SELECT v.*, (SELECT GROUP_CONCAT(method, ',') FROM sale_payments p WHERE p.sale_id = v.id) methods,
       (SELECT GROUP_CONCAT(CAST(qty AS INTEGER) || 'x ' || name, ', ') FROM sale_items i WHERE i.sale_id = v.id) detail
     FROM sales v ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-    ORDER BY v.id DESC LIMIT 1000`).all(...args);
+    ORDER BY v.id DESC LIMIT ?`).all(...args, limit);
   return rows;
 }
 function voidSale({ id, reason, pin }) {
@@ -454,7 +454,7 @@ function listPayments({ status = 'pendiente', method, from, to } = {}) {
     SELECT p.*, v.number, v.day, v.created_at, v.customer, v.total sale_total, v.session_id, v.status sale_status
     FROM sale_payments p JOIN sales v ON v.id = p.sale_id
     WHERE ${where.join(' AND ')}
-    ORDER BY v.id DESC LIMIT 1000`).all(...args);
+    ORDER BY v.id DESC LIMIT ?`).all(...args, limit);
 }
 // Si el pago no llegó, el pedido queda cancelado (status 'rechazada'): no suma en ventas ni en caja
 // y las unidades vuelven a estar disponibles. "Deshacer" lo vuelve a activar.

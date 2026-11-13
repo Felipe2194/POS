@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, money, fmtDateTime, today, toCsv, VERIFY_LABELS, useApp } from '../lib.js';
+import { api, money, fmtDateTime, today, VERIFY_LABELS, useApp } from '../lib.js';
 import { Modal, Stat, StatusPill } from '../components.jsx';
 import { cleanErr } from './Venta.jsx';
 
@@ -24,20 +24,11 @@ export default function Historial() {
   const ok = rows.filter((r) => r.status === 'ok');
   const total = ok.reduce((a, r) => a + r.total, 0);
 
-  const exportCsv = async () => {
-    const csv = toCsv(rows, [
-      { label: 'Fecha', get: (r) => fmtDateTime(r.created_at) },
-      { label: 'Pedido', get: (r) => r.number },
-      { label: 'Cliente', get: (r) => r.customer },
-      { label: 'Detalle', get: (r) => r.detail },
-      { label: 'Medios de pago', get: (r) => (r.methods || '').split(',').map((m) => labels[m] || m).join(' + ') },
-      { label: 'Descuento', get: (r) => r.discount },
-      { label: 'Total', get: (r) => r.total },
-      { label: 'Estado', get: (r) => r.status },
-      { label: 'Caja', get: (r) => r.session_id },
-    ]);
-    const f = await api.exportCsv(`ventas_${from}_a_${to}.csv`, csv);
-    if (f) toast('Exportado a ' + f);
+  const exportExcel = async () => {
+    try {
+      const f = await api.exportSales({ from, to, status: status || undefined, q: q.trim() || undefined });
+      if (f) toast('Exportado a ' + f);
+    } catch (e) { toast(cleanErr(e), 'error'); }
   };
 
   const doVoid = async (sale, reason) => {
@@ -54,7 +45,7 @@ export default function Historial() {
     <div className="page big-page">
       <div className="page-head">
         <h1>Ventas</h1>
-        <button className="btn ghost lg" onClick={exportCsv}>Exportar a Excel (CSV)</button>
+        <button className="btn ghost lg" onClick={exportExcel}>Exportar a Excel</button>
       </div>
       <div className="filters">
         <label className="inline">Desde <input type="date" className="input auto" value={from} onChange={(e) => setFrom(e.target.value)} /></label>

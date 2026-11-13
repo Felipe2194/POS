@@ -5,7 +5,12 @@ const { BrowserWindow } = require('electron');
 const money = (n) =>
   '$ ' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const fmtDate = (iso) => new Date(iso).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+// día/mes/año y 24 hs, sin depender del idioma de Windows
+const fmtDate = (iso) => {
+  const d = new Date(iso);
+  const z = (n) => String(n).padStart(2, '0');
+  return `${z(d.getDate())}/${z(d.getMonth() + 1)}/${d.getFullYear()} ${z(d.getHours())}:${z(d.getMinutes())}`;
+};
 
 function baseCss(widthMm, { scale = 1, bold = false } = {}) {
   // Ancho imprimible típico: 80mm -> ~72mm, 58mm -> ~48mm
