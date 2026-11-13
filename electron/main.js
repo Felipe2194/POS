@@ -20,11 +20,13 @@ app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(
 function createWindow() {
   // Se crea oculta y ya del tamaño de la pantalla: así no se ve una ventana recortada
   // que después se agranda. Se muestra cuando la app avisa que terminó de dibujarse.
-  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  // Siempre en pantalla completa (sin barra de título ni bordes). F11 la alterna por si hace falta.
+  const { width, height } = screen.getPrimaryDisplay().size;
   win = new BrowserWindow({
     width,
     height,
     show: false,
+    fullscreen: true,
     minWidth: 1024,
     minHeight: 640,
     title: 'POS Comidas',
@@ -41,10 +43,13 @@ function createWindow() {
   const reveal = () => {
     if (shown || win.isDestroyed()) return;
     shown = true;
-    win.maximize();
+    win.setFullScreen(true);
     win.show();
     win.focus();
   };
+  win.webContents.on('before-input-event', (e, input) => {
+    if (input.type === 'keyDown' && input.key === 'F11') { e.preventDefault(); win.setFullScreen(!win.isFullScreen()); }
+  });
   ipcMain.once('app:ready', reveal);
   setTimeout(reveal, 6000); // por las dudas, nunca queda invisible
   if (isDev) win.loadURL('http://localhost:5173');
@@ -62,6 +67,10 @@ app.whenReady().then(async () => {
     if (!fn) throw new Error('Método inexistente: ' + method);
     return fn(args);
   });
+
+  // En pantalla completa no hay botones de ventana: la app trae los suyos.
+  ipcMain.handle('win:minimize', () => win?.minimize());
+  ipcMain.handle('win:close', () => win?.close());
 
   ipcMain.handle('printers', async () => {
     const list = await win.webContents.getPrintersAsync();

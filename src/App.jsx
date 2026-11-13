@@ -28,6 +28,7 @@ export default function App() {
   const [collapsed, setCollapsed] = useState(false);
   const [update, setUpdate] = useState(null);
   const [askUpdate, setAskUpdate] = useState(false);
+  const [askClose, setAskClose] = useState(false);
   const unlocked = useRef(false);
 
   // Actualizaciones: se descargan solas, pero se instalan solo si el usuario acepta.
@@ -49,18 +50,27 @@ export default function App() {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), type === 'error' ? 6000 : 3000);
   }, []);
 
+  const [loadError, setLoadError] = useState(null);
   const refresh = useCallback(async () => {
-    const [s, sess, pend] = await Promise.all([
-      api.db('getSettings'),
-      api.db('currentSession'),
-      api.db('listPayments', { status: 'pendiente' }),
-    ]);
-    setSettings(s);
-    setSession(sess);
-    setPending(pend.length);
+    try {
+      const [s, sess, pend] = await Promise.all([
+        api.db('getSettings'),
+        api.db('currentSession'),
+        api.db('listPayments', { status: 'pendiente' }),
+      ]);
+      setSettings(s);
+      setSession(sess);
+      setPending(pend.length);
+      setLoadError(null);
+    } catch (e) {
+      console.error(e);
+      setLoadError(String(e?.message || e).replace(/^Error invoking remote method '[^']+': /, ''));
+    }
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
+  // Si falla la carga inicial se muestra igual la ventana (con el error), nunca queda en "Cargando…"
+  useEffect(() => { if (loadError) api.ready?.(); }, [loadError]);
   useEffect(() => { if (settings) api.setZoom(settings.ui_zoom); }, [settings?.ui_zoom]);
   // Primera vez que todo está dibujado (con zoom aplicado): recién ahí se muestra la ventana
   const announced = useRef(false);
@@ -108,6 +118,25 @@ export default function App() {
   // Al volver a la venta se vuelve a bloquear el área de administración
   useEffect(() => { if (page === 'venta') unlocked.current = false; }, [page]);
 
+  if (!settings && loadError) {
+    return (
+      <div className="loading load-error">
+        <h2>No se pudo iniciar el sistema</h2>
+        <p className="muted">Tus datos no se perdieron. Probá reintentar; si sigue igual, avisá a soporte con este mensaje:</p>
+        <code>{loadError}</code>
+        {update?.status === 'ready' && (
+          <p>Hay una versión nueva ({update.version}) lista que puede corregirlo.</p>
+        )}
+        <div className="row gap mt">
+          {update?.status === 'ready' && (
+            <button className="btn primary lg" onClick={() => api.update.install()}>Instalar versión {update.version}</button>
+          )}
+          <button className={'btn lg ' + (update?.status === 'ready' ? 'ghost' : 'primary')} onClick={refresh}>Reintentar</button>
+          <button className="btn ghost lg" onClick={() => api.closeApp?.()}>Cerrar</button>
+        </div>
+      </div>
+    );
+  }
   if (!settings) return <div className="loading">Cargando…</div>;
 
   const ctx = { settings, session, refresh, toast, askPin, go };
@@ -154,6 +183,14 @@ export default function App() {
               <span className="lbl">Actualización lista<small>versión {update.version}</small></span>
             </button>
           )}
+          <div className="win-btns">
+            <button className="btn ghost" title="Minimizar" onClick={() => api.minimize?.()}>
+              <span className="ico">▁</span><span className="lbl">Minimizar</span>
+            </button>
+            <button className="btn ghost" title="Cerrar el programa" onClick={() => setAskClose(true)}>
+              <span className="ico">⏻</span><span className="lbl">Cerrar</span>
+            </button>
+          </div>
           <div className="offline">● Modo local (sin internet)</div>
         </aside>
         <main className="content">
@@ -164,6 +201,16 @@ export default function App() {
       <div className="toasts">
         {toasts.map((t) => <div key={t.id} className={'toast ' + t.type}>{t.msg}</div>)}
       </div>
+
+      {askClose && (
+        <Modal title="Cerrar el programa" onClose={() => setAskClose(false)} small>
+          <p>¿Cerrar POS Comidas? Las ventas y la caja quedan guardadas.</p>
+          <div className="row end mt">
+            <button className="btn ghost lg" onClick={() => setAskClose(false)}>Cancelar</button>
+            <button className="btn danger lg" onClick={() => api.closeApp()}>Cerrar</button>
+          </div>
+        </Modal>
+      )}
 
       {askUpdate && update?.status === 'ready' && (
         <UpdateModal version={update.version} current={update.current} onClose={() => setAskUpdate(false)} />

@@ -353,3 +353,14 @@ input[type="date"].input { padding: 11px 12px; }
 .update-ready small { display: block; font-weight: 400; opacity: .8; font-size: 13px; margin-top: 2px; }
 .app.collapsed .update-ready { justify-content: center; padding: 14px 0; }
 .app.collapsed .update-ready .lbl { display: none; }
+
+/* Botones de ventana (la app va en pantalla completa, sin barra de título) */
+.win-btns { display: flex; gap: 6px; }
+.win-btns .btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--side-ink); border-color: #1e293b; background: transparent; font-size: 14px; padding: 8px 6px; min-height: 0; }
+.win-btns .btn:hover { background: #1e293b; }
+.app.collapsed .win-btns { flex-direction: column; }
+.app.collapsed .win-btns .lbl { display: none; }
+
+/* Error al iniciar */
+.load-error { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; text-align: center; padding: 40px; }
+.load-error code { background: #fee2e2; color: #991b1b; padding: 10px 14px; border-radius: 8px; max-width: 80ch; word-break: break-word; }

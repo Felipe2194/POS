@@ -454,7 +454,7 @@ function listPayments({ status = 'pendiente', method, from, to } = {}) {
     SELECT p.*, v.number, v.day, v.created_at, v.customer, v.total sale_total, v.session_id, v.status sale_status
     FROM sale_payments p JOIN sales v ON v.id = p.sale_id
     WHERE ${where.join(' AND ')}
-    ORDER BY v.id DESC LIMIT ?`).all(...args, limit);
+    ORDER BY v.id DESC LIMIT 1000`).all(...args);
 }
 // Si el pago no llegó, el pedido queda cancelado (status 'rechazada'): no suma en ventas ni en caja
 // y las unidades vuelven a estar disponibles. "Deshacer" lo vuelve a activar.

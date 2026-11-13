@@ -3,6 +3,8 @@ const { contextBridge, ipcRenderer, webFrame } = require('electron');
 contextBridge.exposeInMainWorld('pos', {
   setZoom: (factor) => webFrame.setZoomFactor(Math.min(1.6, Math.max(0.8, Number(factor) || 1))),
   ready: () => ipcRenderer.send('app:ready'),
+  minimize: () => ipcRenderer.invoke('win:minimize'),
+  closeApp: () => ipcRenderer.invoke('win:close'),
   db: (method, args) => ipcRenderer.invoke('db', method, args),
   printers: () => ipcRenderer.invoke('printers'),
   printSale: (saleId, opts) => ipcRenderer.invoke('print:sale', saleId, opts),
